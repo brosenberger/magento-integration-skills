@@ -35,6 +35,10 @@ Two caveats measured on Magento Open Source 2.4.8-p5:
 - The published schema is **not** the full surface: `/rest/all/schema?services=all` returned 45 paths against 432 routes declared in the install's own `webapi.xml`, identical with and without an admin token. Confirm the endpoints you need are in the export.
 - `webapi.xml` in the install is the authority on whether a route exists. If it is not declared there it does not exist, whatever any documentation says.
 
+## Documentation
+
+An [OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) knowledge bundle lives in [`docs/`](docs/index.md) — what the set covers, how the claims were established, what was not tested, and how fast each class of claim ages.
+
 ## Provenance
 
 Every behavioural claim traces to something executed against a running Magento install — not to documentation and not to reading source, both of which have been wrong about several of these. Verified on **Open Source 2.4.8-p5** with sample data, and where a claim contradicts widely repeated advice, that is usually because the advice was true in an earlier version.
