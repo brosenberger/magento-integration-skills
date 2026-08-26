@@ -17,13 +17,17 @@ The route decides which scope a write lands in, and the unscoped form is not "gl
 - Never let the client fall back to an unscoped route because a scope lookup returned nothing. Fail the entity instead.
 - Know which attributes are scope-dependent before you start. The grouping is not intuitive — display text is usually per store view, commercial values usually global, and enablement is often per website rather than per store view, so "disable in one store view" may not be expressible at all.
 
-**There is no way to un-set a scoped override through a normal write.** Sending an empty value writes an empty value; repeating the global value creates a permanently divergent copy. Restoring inheritance requires deleting the scoped record, which is a distinct operation. Avoid creating the override in the first place: keep an explicit allowlist of scope-dependent attributes and refuse to write anything else through a scoped route.
+**There is no way to un-set a scoped override through a normal write.** Sending an empty value writes an empty value; repeating the global value creates a permanently divergent copy. Restoring inheritance requires deleting the scoped record, which is a distinct operation.
+
+Avoid creating the override in the first place: keep an explicit allowlist of scope-dependent attributes and refuse to write anything else through a scoped route. Where a reset is genuinely needed, it can be added — the platform's own import tooling already defines a sentinel meaning "no value", and a small extension can make a write carrying that sentinel delete the scoped record the way the admin's *use default* control does. Two things to know before building it: the value that triggers the delete is **not the same for every entity type**, and sending the wrong one writes an empty record instead of deleting, which pins "no value" on that scope silently. And the obvious extension point is sometimes wrong — some repositories serialise the entity they are handed, discard it, and repopulate a freshly loaded one, so anything set at that layer is thrown away.
 
 ## "Partial update" is partial only for scalars
 
 Omitted scalar attributes keep their previous value. **Collection-shaped fields do not follow that rule** and each behaves differently — some are replaced wholesale, some merge, some clear only when explicitly emptied. Establish the behaviour per field before relying on it, and never assume that omitting a collection and sending a shorter one mean the same thing.
 
 The practical consequence: **you cannot clear an attribute by omitting it.** A feed that stops exporting a field does not clear it; the stale value persists indefinitely.
+
+The same replace-all shape turns up wherever a collection is nested inside an entity — links, media, option labels. Treat every collection field as "whatever I send becomes the whole set" until proven otherwise, and prove it per field rather than per API.
 
 Linked products deserve specific care: the link collection is typically **replaced as a whole across every link type at once**, so a feed that owns one link type and sends only that will delete the others. If the external system owns a subset, read the current links, preserve the types it does not own, and write the union.
 

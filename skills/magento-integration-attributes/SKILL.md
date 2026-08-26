@@ -1,7 +1,7 @@
 ---
 name: magento-integration-attributes
 description: >-
-  Use when an external system defines Magento 2 product attributes or their options — types, option lists, per-store labels, swatches. Covers what the API accepts, what it silently drops, and why properties added by third-party modules are usually unreachable. Part of the `magento-integration-*` group.
+  Use when an external system defines Magento 2 product attributes or their options — types, option lists, per-store labels, swatches. Covers what the API accepts, what it silently drops, how to change one translation without deleting the others, and why properties added by third-party modules are usually unreachable. Part of the `magento-integration-*` group.
 ---
 
 # magento-integration-attributes — what the attribute API will and will not accept
@@ -28,8 +28,16 @@ Scope is chosen at definition time and is effectively permanent: changing it lat
 
 - **Reference options by identifier. Labels are display data.** Keep an external-value-to-identifier map on your side and treat it as durable; rebuilding it from labels breaks the first time someone renames an option.
 - **Per-store labels are the translation mechanism** and they work cleanly — one write can carry the default label plus a label per store view, and each scope then resolves its own.
+- **The label set is replace-all, and this is where translations get destroyed.** Sending labels for one store view on an option update *deletes every store view you omitted*, and the call succeeds. Updating, adding and removing a translation are therefore the same operation with the same rule: **read the option's current label set, change it, and send it back whole.** Removing one translation means sending the others without it; an empty label removes the row rather than blanking it. Never assemble that set from what the feed happens to know — that is exactly how one language disappears while another is updated.
 - **Creating an option that already exists fails.** Duplicate labels are rejected rather than silently accumulating, which protects the option set but makes option creation **non-idempotent**: a retried batch fails on everything that already landed. Treat "already exists" as the success case on a re-run.
 - Option creation on a swatch-style attribute produces an option with no swatch value — structurally present, visually blank, with no error. Detecting this needs a check for empty swatch data, not for missing records.
+
+## Updating the attribute itself
+
+Two traps sit on the attribute-level update rather than the option one:
+
+- **Naming an option inside an attribute update rewrites that option's labels.** The option survives, but its translations are replaced by whatever the payload carried — usually nothing. Options *not* named are untouched. If the intent is to rename the attribute or change a flag, omit the option collection entirely.
+- **An attribute update that omits the attribute's own identifier is treated as a create**, and fails complaining that an attribute with that code already exists. The message describes a duplicate; the cause is a missing field.
 
 ## Attribute sets
 

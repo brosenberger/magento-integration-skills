@@ -43,6 +43,8 @@ These recur in every family. Check each one per endpoint rather than assuming th
 - **Queued acceptance is not completion.** An accepted batch is a receipt, not a result. Poll for terminal status and treat anything unfinished as an incident; failed operations are not retried indefinitely on their own.
 - **There are no cross-resource transactions.** Structure, media, prices and stock are separate writes with no shared rollback. Design for partial state: make each step idempotent, record per-entity progress, make re-running a failed batch safe.
 - **Indexer mode decides the runtime.** Update-on-save turns every write into a reindex. Schedule mode plus a drain is the difference between one hour and nine.
+- **A generic failure message is a wrapper, not a cause.** Repositories catch and re-throw as "could not save", discarding nothing but telling you nothing either. The original is attached underneath — read the wrapped exception before changing any code. Guessing at fixtures, permissions or configuration because the top-level message was vague costs hours that one unwrap would have saved.
+- **"The indexer has not caught up" is the most over-used diagnosis in this platform.** Some values are computed at read time and genuinely need an index; others are stored flags that something is supposed to recompute and did not. Reindexing cannot repair a stale stored flag — the index will faithfully reproduce it. Establish which kind you are looking at before scheduling a reindex.
 
 ## Access, before anything else
 

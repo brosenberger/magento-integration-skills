@@ -1,7 +1,7 @@
 ---
 name: magento-integration-prices-stock
 description: >-
-  Use when syncing Magento 2 prices, costs, tier prices or stock quantities from an external system. Covers why these never belong in a product save, the opposite error models of the price and stock paths, and the salable-versus-source quantity trap. Part of the `magento-integration-*` group.
+  Use when syncing Magento 2 prices, costs, tier prices or stock quantities from an external system. Covers why these never belong in a product save, the opposite error models of the price and stock paths, salable-versus-source quantity, and why a variant parent stays out of stock when reindexing does not help. Part of the `magento-integration-*` group.
 ---
 
 # magento-integration-prices-stock — commercial data without a product save
@@ -45,7 +45,15 @@ There is a modern multi-source path and a legacy single-source view of the same 
 
 ## Parent products derive their status
 
-A variant parent's stock status is computed from its children; it cannot be set. When a parent looks wrong, the cause is almost always one of: children created before their quantities, a source not linked to the right stock, disabled or off-website children, outstanding reservations, or simply the indexer not having caught up. Check in that order before touching the import.
+A variant parent's stock status cannot be set directly. It is a **stored flag on the parent**, not a value computed when read — and that distinction is the whole problem, because the usual diagnosis is wrong.
+
+**Reindexing does not fix a parent that will not go in stock.** The index faithfully reproduces the stored flag: the index is right, the flag is stale. Measured on a current version with a single source and one linked child, the parent stayed out of stock after the child was stocked through the dedicated stock path, after a full reindex of both inventory indexes, *and* after an ordinary product save on the child.
+
+The reason is a substitution most people never see. The legacy inventory module re-evaluates a parent's flag through a processor invoked from its product-save observer — the mechanism everyone has in mind. The multi-source inventory module then declares a preference **replacing that observer**, and the replacement carries no parent processor at all. Multi-source inventory is enabled by default on every modern version, so on a normal install that re-evaluation is simply absent.
+
+Practical consequence: **if the catalogue has variant parents or bundles, their stock flags must be driven deliberately.** A stock feed alone will not maintain them. Either touch the parent through a path that recomputes it, or run a reconciliation job that compares parents against their children. When a parent will not go in stock, suspect a stale stored flag first and the indexer last.
+
+The older checklist still applies underneath it — children created before their quantities, a source not linked to the stock the website sells from, disabled or off-website children, outstanding reservations — but check the parent's own flag before any of them.
 
 ## Verification
 
