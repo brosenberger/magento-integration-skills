@@ -24,6 +24,10 @@ Two consequences that follow directly:
 - A bounded range needs its lower and upper conditions in **separate groups**. Put both in one group and they OR — which matches nearly everything and looks like the filter was ignored.
 - Membership in a set is one condition with a set operator, not several equality conditions. Both work; the set operator says what it means and is shorter.
 
+Two operators are easy to miss because most write-ups omit them: a **negated set-membership** test for multi-value fields, and a **greater-or-equal variant** that exists alongside the usual comparison family. Both are implemented in the query builder. Worth knowing before writing a client-side filter to compensate for one you assumed was missing.
+
+One documented limit applies everywhere: **only top-level fields are searchable.** Anything nested behind an extension or custom-attribute container cannot be filtered on directly, and attempting it fails as a storage-layer error naming a column rather than as a validation message — which reads like a bug in your query rather than an unsupported operation.
+
 ## Reads that silently do nothing
 
 The recurring failure. A query is accepted, returns a plausible result, and one of its instructions was quietly discarded.
