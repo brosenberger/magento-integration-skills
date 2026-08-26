@@ -67,6 +67,8 @@ Two ways to cause the same state without importing at all:
 - **Sending the marker yourself.** It is a writable field on the public stock DTO and it appears in payload examples in the wild. A template that carries it as cleared latches every parent it touches.
 - **Enabling a second inventory source.** Parent maintenance is gated on the install being in single-source mode, and that is defined as *fewer than two enabled sources* — not two sources in use. A second enabled source assigned to nothing at all still switches parent maintenance off entirely.
 
+Those two are not the same failure, and the difference decides how urgent it is. Sending the marker produces a genuinely unbuyable parent. The multi-source gate does not: salability is still computed correctly there, so the storefront behaves, and only the **stored** flag goes stale — the value the admin and the stock-item read endpoint report. Multi-source therefore makes the platform *report* a status contradicting what it will actually sell. Harmless to a shopper, dangerous to any integration that reads the value back and trusts it.
+
 Practical consequences:
 
 - **Send stock before creating parents.** Ordering is not a throughput preference here; it decides whether parents can ever become salable.
