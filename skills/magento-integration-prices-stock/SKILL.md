@@ -62,12 +62,15 @@ The trap is where that marker comes from. **A product created without stock data
 
 Step 3 revives nothing — not then, not ever. This is the most common cause of "the import worked but nothing is buyable", and it is not latency: waiting and reindexing change nothing.
 
-Two ways to cause the same state without importing at all:
+The marker is also not written once and left alone. **The platform clears it on every product save.** So a parent that is currently out of stock and receives any routine structural update — a description change, a re-save while attaching children — is latched again from that moment. A catalogue can pass go-live and latch itself weeks later, which is why this looks intermittent and unreproducible from the outside.
 
+Three ways to reach the same state without importing at all:
+
+- **Re-saving an out-of-stock parent.** Any product write clears the marker, so a structural feed re-latches every parent that happens to be out of stock when it runs.
 - **Sending the marker yourself.** It is a writable field on the public stock DTO and it appears in payload examples in the wild. A template that carries it as cleared latches every parent it touches.
 - **Enabling a second inventory source.** Parent maintenance is gated on the install being in single-source mode, and that is defined as *fewer than two enabled sources* — not two sources in use. A second enabled source assigned to nothing at all still switches parent maintenance off entirely, freezing every parent's stored status where it stands.
 
-On a multi-source install that last one is the most severe of the three, not the mildest, because a second defect compounds it. The per-stock salability index for variant parents derives each secondary stock's answer partly from the parent's stored flag **for the default stock** — a value scoped to a different stock. Frozen flag plus that veto, on a parent created by an import and therefore starting out of stock, means the parent is unsalable in *every* stock and stays that way. On stock platform code, a multi-source catalogue loaded through the API has no buyable variant parents at all.
+On a multi-source install the source one is the most severe, not the mildest, because a second defect compounds it. The per-stock salability index for composite parents derives each secondary stock's answer partly from the parent's stored flag **for the default stock** — a value scoped to a different stock. Frozen flag plus that veto, on a parent created by an import and therefore starting out of stock, means the parent is unsalable in *every* stock and stays that way. On stock platform code, a multi-source catalogue loaded through the API has no buyable composite parents at all — variant, bundle or grouped; all three are affected, each through its own index query.
 
 The two defects also explain each other, which matters if you are tempted to patch one. The gate exists *because* of the veto: lift the gate alone and the recompute starts writing a correct default-scoped flag, which the veto then propagates into secondary stocks, marking parents unsalable in stocks whose children are fine. That is a known, still-reproducible regression. Either half alone is useless or harmful.
 
@@ -75,7 +78,7 @@ Practical consequences:
 
 - **Send stock before creating parents.** Ordering is not a throughput preference here; it decides whether parents can ever become salable.
 - **Never send the automatic-status marker.** Strip it out of payload templates rather than echoing back whatever a read returned.
-- **On multi-source, verify that variant parents are salable at all** before launch, rather than assuming stock feeds will sort it out. Reconciling the stored flag is not sufficient on its own there.
+- **On multi-source, verify that composite parents are salable at all** before launch, rather than assuming stock feeds will sort it out. Reconciling the stored flag is not sufficient on its own there.
 - **Repairing a stuck parent takes two steps:** restore the marker *and* re-derive the status. Restoring the marker alone only makes the next child write effective, which may never come.
 
 The older checklist still applies underneath — children created before their quantities, a source not linked to the stock the website sells from, disabled or off-website children, outstanding reservations — but check the parent's own stored flag before any of them.
