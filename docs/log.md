@@ -22,6 +22,12 @@
 - Removed the read-mechanics duplication introduced across flow, catalog-structure and categories; family-specific read facts stayed with their family
 - Access preconditions — credential choice, token lifetime, permission scoping, the unauthenticated surface — added to the flow skill rather than becoming a skill, on the grounds that the material is a precondition and is not yet fully verified
 
+### Access and a correction
+
+- Recorded that using an integration credential as a plain bearer token is deprecated, disabled by default, and fails with an error that blames permissions rather than the toggle
+- Recorded that the API description the install produces is permission-scoped, so generating it against the client's own credential yields exactly that client's reachable surface
+- **Corrected** the earlier claim that the schema export covered 45 paths regardless of credential: it is 325 paths and 410 operations with a valid administrator credential, against 344 declared URL templates. The original measurement was served anonymously because the credential had expired, and returned a valid-looking smaller schema rather than an error
+
 ### Documentation
 
 - OKF v0.2 bundle under `docs/`: skill set, concrete calls, verification, version sensitivity

@@ -54,6 +54,14 @@ On the read side, three failures were confirmed rather than assumed: a category 
 
 The lesson is directional: where a claim here contradicts common advice, that is usually because the advice aged rather than because it was ever wrong.
 
+# A correction made during verification
+
+Worth recording because it is the failure mode this bundle warns about, committed by the bundle itself.
+
+An earlier version reported that the published API schema returned 45 paths regardless of credential, and concluded the export was a fragment of the real surface. Re-measuring with a freshly issued credential gave **325 paths and 410 operations** against 344 distinct declared URL templates — roughly 95% coverage, and clearly permission-scoped: 45 anonymous, 71 for a catalog-only integration credential, 325 for an administrator.
+
+The original request had almost certainly outlived its credential's short lifetime and was being served anonymously. Nothing in the response said so; it returned a valid schema, just a smaller one. **A successful response to an unauthenticated request looked exactly like a successful response to an authenticated one** — which is the same class of silent failure documented throughout these skills, and it survived one round of review before being caught.
+
 # Not tested
 
 Stated explicitly, because silence reads as coverage:
@@ -63,3 +71,4 @@ Stated explicitly, because silence reads as coverage:
 - **Behaviour at catalog scale.** Rewrite growth and reassignment cost need a catalog far larger than sample data.
 - **Reservation behaviour under concurrent orders.** Needs order traffic this pass did not generate.
 - **Single-scope topologies.** At least one protective check appears conditional on an entity being visible in more than one scope; that branch was read, not exercised.
+- **The permission surface in depth.** Credential lifetime, the bearer-token toggle and basic role scoping were exercised; the full authorization model and the security implications of the unauthenticated endpoints were not.

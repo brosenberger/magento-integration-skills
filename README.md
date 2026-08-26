@@ -31,10 +31,10 @@ Per-folder symlinks, idempotent, and it never overwrites something already there
 
 These skills deliberately stop short of request shapes. Export the API description from the install you are integrating with, import it into a collection, and drive that over MCP — generated from the real system, regenerating when it changes.
 
-Two caveats measured on Magento Open Source 2.4.8-p5:
+Two things measured on Magento Open Source 2.4.8-p5:
 
-- The published schema is **not** the full surface: `/rest/all/schema?services=all` returned 45 paths against 432 routes declared in the install's own `webapi.xml`, identical with and without an admin token. Confirm the endpoints you need are in the export.
-- `webapi.xml` in the install is the authority on whether a route exists. If it is not declared there it does not exist, whatever any documentation says.
+- **The export is permission-scoped.** The same schema request returned 45 paths anonymously, 325 with an admin token, and 71 with an integration token scoped to catalog only. Generate it against the credential the client will actually use and it describes exactly that client's reachable surface.
+- **`webapi.xml` in the install is the authority on whether a route exists.** If it is not declared there it does not exist, whatever any documentation says.
 
 ## Documentation
 

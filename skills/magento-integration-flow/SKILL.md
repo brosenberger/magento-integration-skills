@@ -52,6 +52,8 @@ Every call needs credentials, and the wrong credential choice fails hours into a
 - **Cache the credential rather than re-authenticating per call.** Issuing one is itself an expensive request.
 - **Scope the integration account to what it actually needs.** Each endpoint declares the permission it requires; an integration that runs as a full administrator is one compromise away from being a full administrator.
 - **Know which endpoints need no credential at all.** A significant part of the surface is deliberately unauthenticated — account creation and guest flows among them — which is a security consideration for the store, not a convenience for the integration. Do not assume an endpoint is protected because it writes.
+- **Using a long-lived integration credential as a plain bearer token is disabled by default and has to be turned on.** Recent versions treat that pattern as deprecated: the credential is issued and valid, and every call still fails until the store enables it explicitly. **The failure is badly misleading** — it reports that the consumer is not authorized for a resource the integration demonstrably *does* have, which sends people to audit permissions when the cause is a store-wide toggle. Check the toggle before the role. The properly-supported path remains the token-exchange flow; enabling the bearer shortcut is a deliberate decision to re-open something the platform deprecated.
+- **Permission scoping is real and worth using.** A credential restricted to what it needs is refused elsewhere with an error naming the missing resource — and the same scoping shapes the API description the install will hand you.
 
 ## Reading data back
 
@@ -65,9 +67,9 @@ These skills stay agnostic on purpose: routes, payload shapes and field names ar
 
 **Export the API description from the running install and drive it as a tool**, rather than hand-writing a route index. The platform publishes a machine-readable schema; import it into a collection and expose that collection over MCP, so the concrete calling layer is generated from the same system you are integrating with and regenerates when it changes. See the `postman-collection-mcp` skills for the setup.
 
-Two caveats measured rather than assumed:
+Two things worth knowing about that export:
 
-- **The published schema is not the whole API.** On one 2.4.8-p5 install the schema endpoint returned 45 paths against 432 routes actually declared in the install's own configuration, identical with and without an admin token. Treat the export as a starting point and confirm the endpoints you need are in it.
+- **It is permission-scoped.** The schema reflects what the requesting credential may call — measured on one install as 45 paths anonymously, 325 with an administrator credential, and 71 with an integration credential restricted to catalog. Generate it with the credential the client will actually use, and the result describes exactly that client's reachable surface rather than a theoretical one.
 - **The declared configuration in the install is the authority on existence.** If a route is not declared there, it does not exist, whatever any documentation or model says. That check is what prevents invented endpoints, and it costs one search.
 
 Everything else in this skill set is behaviour, which no schema describes.
