@@ -1,7 +1,7 @@
 ---
 name: magento-integration-prices-stock
 description: >-
-  Use when syncing Magento 2 prices, costs, tier prices or stock quantities from an external system. Covers why these never belong in a product save, the opposite error models of the price and stock paths, salable-versus-source quantity, and why a variant parent stays out of stock when reindexing does not help. Part of the `magento-integration-*` group.
+  Use when syncing Magento 2 prices, costs, tier prices or stock quantities from an external system. Covers why these never belong in a product save, the opposite error models of the price and stock paths, salable-versus-source quantity, and why a variant parent created before its stock is permanently stuck out of stock. Part of the `magento-integration-*` group.
 ---
 
 # magento-integration-prices-stock — commercial data without a product save
@@ -47,13 +47,34 @@ There is a modern multi-source path and a legacy single-source view of the same 
 
 A variant parent's stock status cannot be set directly. It is a **stored flag on the parent**, not a value computed when read — and that distinction is the whole problem, because the usual diagnosis is wrong.
 
-**Reindexing does not fix a parent that will not go in stock.** The index faithfully reproduces the stored flag: the index is right, the flag is stale. Measured on a current version with a single source and one linked child, the parent stayed out of stock after the child was stocked through the dedicated stock path, after a full reindex of both inventory indexes, *and* after an ordinary product save on the child.
+**Reindexing does not fix a parent that will not go in stock.** The index faithfully reproduces the stored flag: the index is right, the flag is stale.
 
-The reason is a substitution most people never see. The legacy inventory module re-evaluates a parent's flag through a processor invoked from its product-save observer — the mechanism everyone has in mind. The multi-source inventory module then declares a preference **replacing that observer**, and the replacement carries no parent processor at all. Multi-source inventory is enabled by default on every modern version, so on a normal install that re-evaluation is simply absent.
+The platform does maintain that flag — a child stock write re-derives the parent from its children — but the rule it applies is asymmetric:
 
-Practical consequence: **if the catalogue has variant parents or bundles, their stock flags must be driven deliberately.** A stock feed alone will not maintain them. Either touch the parent through a path that recomputes it, or run a reconciliation job that compares parents against their children. When a parent will not go in stock, suspect a stale stored flag first and the indexer last.
+- **Downwards is unconditional.** When every child goes out of stock, the parent always follows them out.
+- **Upwards is conditional.** To move a parent back *into* stock, the platform first requires a marker recording that the parent's present status was set automatically rather than by a person. Without that marker it refuses, on the grounds that it would be overruling a human decision.
 
-The older checklist still applies underneath it — children created before their quantities, a source not linked to the stock the website sells from, disabled or off-website children, outstanding reservations — but check the parent's own flag before any of them.
+The trap is where that marker comes from. **A product created without stock data is stored as out of stock with the marker cleared.** Nobody decided anything — those are simply the column defaults. So a parent created before its stock exists is born in the one state the platform will never move it out of, and the ordinary feed order walks straight into it:
+
+1. create parents and children (structure only)
+2. link the children
+3. send quantities in a later feed
+
+Step 3 revives nothing — not then, not ever. This is the most common cause of "the import worked but nothing is buyable", and it is not latency: waiting and reindexing change nothing.
+
+Two ways to cause the same state without importing at all:
+
+- **Sending the marker yourself.** It is a writable field on the public stock DTO and it appears in payload examples in the wild. A template that carries it as cleared latches every parent it touches.
+- **Enabling a second inventory source.** Parent maintenance is gated on the install being in single-source mode, and that is defined as *fewer than two enabled sources* — not two sources in use. A second enabled source assigned to nothing at all still switches parent maintenance off entirely.
+
+Practical consequences:
+
+- **Send stock before creating parents.** Ordering is not a throughput preference here; it decides whether parents can ever become salable.
+- **Never send the automatic-status marker.** Strip it out of payload templates rather than echoing back whatever a read returned.
+- **On multi-source, treat parent flags as unmaintained** and reconcile them yourself.
+- **Repairing a stuck parent takes two steps:** restore the marker *and* re-derive the status. Restoring the marker alone only makes the next child write effective, which may never come.
+
+The older checklist still applies underneath — children created before their quantities, a source not linked to the stock the website sells from, disabled or off-website children, outstanding reservations — but check the parent's own stored flag before any of them.
 
 ## Verification
 

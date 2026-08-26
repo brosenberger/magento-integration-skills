@@ -38,9 +38,12 @@ Order is not negotiable, and getting it wrong mostly does not raise an error:
 1. The differentiating attribute must exist, be globally scoped, and be usable for variants.
 2. Its options must exist, and you must reference them by **identifier, not label**.
 3. Every child must exist and already carry its attribute value.
-4. Only then create the parent and attach options and children.
+4. Every child should already have its stock, before the parent exists — see below.
+5. Only then create the parent and attach options and children.
 
 Creating a parent with options and no children succeeds and produces an unbuyable product page with no exception anywhere. Referencing an option identifier that does not exist may also succeed and store nothing.
+
+Step 4 looks like a throughput preference and is not. A parent created while its children have no stock is stored in a state the platform will never move it out of, so it stays unbuyable permanently no matter how much quantity arrives later. The mechanism is in `magento-integration-prices-stock`; the ordering consequence belongs here, because it is decided when the structure is written.
 
 Attaching a child that is already attached fails — the attach operation is not idempotent, unlike its category counterpart. Retry logic must be written per call.
 
