@@ -45,6 +45,12 @@ Define the subtree the feed owns and diff only within it. The external system kn
 - **Deleting a category cascades** to its children and unassigns every product beneath. There is no dry run. A hierarchy renumbering that triggers deletes can remove a subtree in one call.
 - **Rewrite rows multiply with assignments.** Reassigning categories across a large catalog regenerates them all and is usually the slowest part of the whole import.
 
+## Reading assignments back
+
+The category side is authoritative for **order**: it returns position per assignment, and the product collection cannot sort by it. A sort on position against products is accepted and silently ignored, so any merchandised ordering has to come from the category endpoint and be joined client-side.
+
+Filtering products by category uses the singular link field. The plural one visible in read responses is not a filter and fails hard rather than quietly.
+
 ## Verification
 
 - Re-run and confirm the second run changes nothing.

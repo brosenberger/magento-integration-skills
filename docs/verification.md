@@ -50,6 +50,8 @@ Each of these is widely repeated and was false on the tested version:
 - An attribute value outside the entity's attribute set is written and merely hidden. It is not written at all.
 - Two long-standing pagination and filtering defects on a listing endpoint. Both fixed.
 
+On the read side, three failures were confirmed rather than assumed: a category filter returning 347 products where the storefront lists 32, a sort on position accepted and silently ignored (identical order ascending and descending), and the plural category-link field returning a server error rather than filtering.
+
 The lesson is directional: where a claim here contradicts common advice, that is usually because the advice aged rather than because it was ever wrong.
 
 # Not tested

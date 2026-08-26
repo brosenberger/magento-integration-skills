@@ -1,7 +1,7 @@
 ---
 name: magento-integration-flow
 description: >-
-  Use when planning or sequencing a Magento 2 data integration — an ERP, PIM or OMS feed pushing catalog, customer or order data. Covers build order, the cross-cutting failure modes every endpoint family shares, and when to stop and verify. Entry point for the `magento-integration-*` group skills.
+  Use when planning or sequencing a Magento 2 data integration — an ERP, PIM or OMS feed pushing catalog, customer or order data. Covers build order, the cross-cutting failure modes every endpoint family shares, reading data back, and when to stop and verify. Entry point for the `magento-integration-*` group skills.
 ---
 
 # magento-integration-flow — sequencing a Magento data integration
@@ -43,6 +43,16 @@ These recur in every family. Check each one per endpoint rather than assuming th
 - **Queued acceptance is not completion.** An accepted batch is a receipt, not a result. Poll for terminal status and treat anything unfinished as an incident; failed operations are not retried indefinitely on their own.
 - **There are no cross-resource transactions.** Structure, media, prices and stock are separate writes with no shared rollback. Design for partial state: make each step idempotent, record per-entity progress, make re-running a failed batch safe.
 - **Indexer mode decides the runtime.** Update-on-save turns every write into a reindex. Schedule mode plus a drain is the difference between one hour and nine.
+
+## Reading data back
+
+Every family in this set is written about as a write path, but integrations read too — to diff, to reconcile, and to reproduce what the shop shows. Reads have their own failure modes, and they are quieter than the write ones.
+
+- **A filter that does not apply usually does not complain.** Sorting on a field the collection cannot reach is accepted and ignored; requesting ascending and descending and getting identical order is the cheapest way to detect it. Assume nothing applied until the result proves it did.
+- **Query filters do not reproduce storefront logic.** A collection query returns entity rows. Visibility, enablement, price rules and stock-based exclusions are applied by the storefront on top, so a query that looks like a listing is not one until every one of those is filtered for explicitly.
+- **A field that appears in a response is not necessarily filterable.** Read shape and query shape are different contracts, and the mismatch fails inconsistently — sometimes ignored, sometimes a server error.
+- **Never page a query while writing to the same entities.** Concurrent writes shift the result set between pages, silently skipping or duplicating records. Snapshot first, or sort on a stable key and page by that rather than by offset.
+- **Filter combination has one rule and one hard limit.** Conditions in different groups combine with AND, conditions within a group combine with OR. `(A AND B) OR (C AND D)` is not expressible — a feed needing that shape needs two requests, and designing around it late is expensive.
 
 ## When you need concrete calls
 

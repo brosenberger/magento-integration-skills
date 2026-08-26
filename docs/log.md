@@ -10,6 +10,12 @@
 - POSIX `sh` symlink installer, idempotent, refuses to overwrite an existing local skill
 - MIT licence
 
+### Read paths
+
+- Added reading coverage: reproducing a category listing, and reads as a cross-cutting concern
+- Three silent read failures recorded: variant children inflating category membership (347 against 32 on one sample category), the plural category-link field failing hard rather than filtering, and a sort on position being accepted and ignored
+- Filter-combination limit recorded: AND across groups, OR within a group, and `(A AND B) OR (C AND D)` not expressible
+
 ### Documentation
 
 - OKF v0.2 bundle under `docs/`: skill set, concrete calls, verification, version sensitivity

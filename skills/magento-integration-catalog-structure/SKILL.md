@@ -1,7 +1,7 @@
 ---
 name: magento-integration-catalog-structure
 description: >-
-  Use when an external system creates or updates Magento 2 products — the structural half of a catalog feed. Covers scope fallback, what "partial update" really means, variant sequencing, product types, link replacement, and the writes that report success and store nothing. Part of the `magento-integration-*` group.
+  Use when an external system creates or updates Magento 2 products — the structural half of a catalog feed. Covers scope fallback, what "partial update" really means, variant sequencing, product types, link replacement, reproducing a category listing, and the writes that report success and store nothing. Part of the `magento-integration-*` group.
 ---
 
 # magento-integration-catalog-structure — products, variants and the silent writes
@@ -47,6 +47,16 @@ The recurring failure mode in this family. Writes that report success and store 
 **Attribute-set membership is the one that costs the most time.** The value is discarded on the way in, so nothing fails at write time — and the failure surfaces requests later, on an unrelated call, with a message that names the wrong thing. Validate that every attribute you intend to write belongs to the target attribute set as a pre-flight, not as a support ticket.
 
 Product types also differ in what they accept: some silently drop a price they do not own, some coerce it, and at least one refuses to be created without extra structure. Read back what you wrote for each type once, then encode it.
+
+## Reading a category listing back
+
+Integrations read as well as write, and reproducing "the products in this category, as the shop shows them" is where the three silent read failures live.
+
+- **Visibility.** A category's membership includes variant children that are never shown individually. Filtering on the category alone can return an order of magnitude more than the storefront does — measured at 347 against 32 on one sample-data category. Restrict to the visibility values that mean catalog-visible, and to enabled products, remembering that enablement may be scoped per website rather than per store view.
+- **The link field.** The singular category-link field is the one that filters. The plural field that appears in read responses — the one most people try first — does not filter; on the tested version it returns a server error rather than an empty or unfiltered result.
+- **Merchandised order cannot be expressed on the product collection.** A sort on position is accepted and silently ignored, because position belongs to the category-to-product relation rather than to the product. Requesting ascending and descending returns identical order. Read the ordering from the category side, which carries position per assignment, and join it to product data client-side.
+
+And an honest limit: this reproduces a listing's contents and order, not its behaviour. Layered navigation, price rules and stock-based exclusions are applied on top and are invisible to this query.
 
 ## Throughput
 
