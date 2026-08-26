@@ -49,7 +49,7 @@ Define the subtree the feed owns and diff only within it. The external system kn
 
 The category side is authoritative for **order**: it returns position per assignment, and the product collection cannot sort by it. A sort on position against products is accepted and silently ignored, so any merchandised ordering has to come from the category endpoint and be joined client-side.
 
-Filtering products by category uses the singular link field. The plural one visible in read responses is not a filter and fails hard rather than quietly.
+Filtering products by category uses the singular link field. The plural one visible in read responses is not a filter and fails hard rather than quietly — an instance of the general rule in `magento-integration-querying` that a field appearing in a response is not necessarily filterable.
 
 ## Verification
 

@@ -8,7 +8,8 @@ Agent skills for building a data integration against Magento 2 — an ERP, PIM o
 
 | Skill | Covers |
 |---|---|
-| `magento-integration-flow` | Build order, the failure modes every endpoint family shares, when to stop and verify. Start here |
+| `magento-integration-flow` | Build order, access preconditions, the failure modes every endpoint family shares, when to stop and verify. Start here |
+| `magento-integration-querying` | Reading data out: filter combination and its hard limit, reads that silently do nothing, paging safely while writing |
 | `magento-integration-catalog-structure` | Products and variants: scope fallback, partial-update semantics, sequencing, writes that report success and store nothing |
 | `magento-integration-attributes` | Types, options, per-store labels, swatches, and why third-party attribute properties are usually unreachable |
 | `magento-integration-media` | Unbounded duplication, the global-gallery vs per-store-view-role split, deletion refusals |

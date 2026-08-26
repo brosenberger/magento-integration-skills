@@ -58,6 +58,8 @@ Integrations read as well as write, and reproducing "the products in this catego
 
 And an honest limit: this reproduces a listing's contents and order, not its behaviour. Layered navigation, price rules and stock-based exclusions are applied on top and are invisible to this query.
 
+Query mechanics — filter combination, paging while writing, detecting a sort that did nothing — are in `magento-integration-querying`.
+
 ## Throughput
 
 - Batched and queued submission trades immediate per-item errors for request count. That is usually right for imports and wrong for anything user-facing.

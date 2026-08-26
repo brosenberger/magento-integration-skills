@@ -16,6 +16,12 @@
 - Three silent read failures recorded: variant children inflating category membership (347 against 32 on one sample category), the plural category-link field failing hard rather than filtering, and a sort on position being accepted and ignored
 - Filter-combination limit recorded: AND across groups, OR within a group, and `(A AND B) OR (C AND D)` not expressible
 
+### Querying extracted
+
+- New `magento-integration-querying`: filter combination and the `(A AND B) OR (C AND D)` limit, reads that silently do nothing, paging safely while writing, read cost
+- Removed the read-mechanics duplication introduced across flow, catalog-structure and categories; family-specific read facts stayed with their family
+- Access preconditions — credential choice, token lifetime, permission scoping, the unauthenticated surface — added to the flow skill rather than becoming a skill, on the grounds that the material is a precondition and is not yet fully verified
+
 ### Documentation
 
 - OKF v0.2 bundle under `docs/`: skill set, concrete calls, verification, version sensitivity

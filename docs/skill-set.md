@@ -15,7 +15,8 @@ stale_after: 2027-08-25T00:00:00Z
 
 | Skill | Covers | Ships with |
 |---|---|---|
-| `magento-integration-flow` | Build order, cross-cutting failure modes, when to verify | the *Magento ERP Integration* pillar |
+| `magento-integration-flow` | Build order, access preconditions, cross-cutting failure modes, when to verify | the *Magento ERP Integration* pillar |
+| `magento-integration-querying` | Reading data out: filter model, silent no-ops, paging while writing | the *Magento ERP Integration* pillar |
 | `magento-integration-catalog-structure` | Products and variants; scope fallback; silent writes | `magento2-rest-product-import-pitfalls` |
 | `magento-integration-attributes` | Types, options, per-store labels, swatches, third-party properties | `magento2-rest-product-attributes` |
 | `magento-integration-media` | Duplication, gallery-vs-role scope split, deletion refusals | `magento2-rest-product-media` |
@@ -23,6 +24,14 @@ stale_after: 2027-08-25T00:00:00Z
 | `magento-integration-categories` | Missing natural key, assignment asymmetry, removal | `magento2-rest-category-integration` |
 
 `magento-integration-flow` is the entry point and delegates to the rest. It restates the cross-cutting pitfalls the group skills also touch — right for standalone use, a maintenance cost when a shared claim changes. That duplication is deliberate and should be reviewed if the set grows.
+
+# Why querying is its own skill and access is not
+
+Read mechanics were originally written into three skills at once, which is the exact drift risk the note above warns about. They are also genuinely cross-cutting: filter combination, paging and sort behaviour are identical whatever entity is being read. Extracting `magento-integration-querying` removes the duplication and gives reading its own trigger, which is a different moment from importing.
+
+Family-specific read *facts* stayed with their family — that a category's membership includes never-listed variant children is catalog semantics, not query mechanics.
+
+**Access deliberately did not become a skill.** Credential choice, token lifetime, permission scoping and the unauthenticated surface are a precondition for every call rather than a mode of operation, so they sit at the top of the flow skill. The material is also thin: token lifetime and the size of the anonymous surface are verified, but permission scoping for an integration account and the security consequences of the unauthenticated endpoints have not been exercised. That work belongs with the customer wave, which is where it is actually reached — and a skill padded out ahead of its verification would be exactly what this set is trying not to be.
 
 # Why no routes or payloads
 
