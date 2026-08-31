@@ -54,29 +54,42 @@ The platform does maintain that flag — a child stock write re-derives the pare
 - **Downwards is unconditional.** When every child goes out of stock, the parent always follows them out.
 - **Upwards is conditional.** To move a parent back *into* stock, the platform first requires a marker recording that the parent's present status was set automatically rather than by a person. Without that marker it refuses, on the grounds that it would be overruling a human decision.
 
-The trap is where that marker comes from. **A product created without stock data is stored as out of stock with the marker cleared.** Nobody decided anything — those are simply the column defaults. So a parent created before its stock exists is born in the one state the platform will never move it out of, and the ordinary feed order walks straight into it:
+The trap is where that marker comes from. **A parent created with neither stock data nor its children is stored as out of stock with the marker cleared.** Nobody decided anything — those are simply the column defaults. So it is born in the one state the platform will never move it out of, and the ordinary feed order walks straight into it:
 
-1. create parents and children (structure only)
-2. link the children
-3. send quantities in a later feed
+1. create the parent on its own (structure only)
+2. link the children in a later call
+3. send quantities in a later feed still
 
-Step 3 revives nothing — not then, not ever. This is the most common cause of "the import worked but nothing is buyable", and it is not latency: waiting and reindexing change nothing.
+Steps 2 and 3 revive nothing — not then, not ever. This is the most common cause of "the import worked but nothing is buyable", and it is not latency: waiting and reindexing change nothing.
 
-The marker is also not written once and left alone. **The platform clears it on every product save.** So a parent that is currently out of stock and receives any routine structural update — a description change, a re-save while attaching children — is latched again from that moment. A catalogue can pass go-live and latch itself weeks later, which is why this looks intermittent and unreproducible from the outside.
+**The decisive factor is whether the parent has its children at the moment it is created**, not whether stock exists yet. A parent created *already carrying* its links or options is born with the marker set, because the recompute runs inside that same save and records that it moved the status itself. That single difference explains why this defect looks intermittent between integrations: one that sends structure and links together never sees it, and its authors reasonably conclude the problem is somewhere else.
+
+Measured states at creation, all three composite types:
+
+| How the parent is created | Stored status | Marker | Can it ever recover? |
+|---|---|---|---|
+| Alone, no stock data | out of stock | cleared | **no** |
+| Alone, with stock data saying in stock | in stock | cleared | yes — see below |
+| Together with its links or options | out of stock | **set** | yes |
+
+The second row works for a non-obvious reason worth understanding rather than memorising: the parent starts *in* stock, so the first time its children are all unsalable the platform moves it out — and moving it out is the automatic path, which sets the marker. From then on it can come back. Being born in stock buys the marker on the way down.
 
 Three ways to reach the same state without importing at all:
 
-- **Re-saving an out-of-stock parent.** Any product write clears the marker, so a structural feed re-latches every parent that happens to be out of stock when it runs.
+- **Re-saving an out-of-stock parent.** Reported on 2.4.8-p5 and 2.4.9: a routine product write clears the marker again, so a structural feed re-latches every parent that is out of stock when it runs. Treat as version-sensitive — this did **not** reproduce on `2.4-develop` in August 2026, where no later save cleared the marker and the one platform plugin that clears it is variant-only and was never reached on the product-save path. If you are on a released version, assume it happens; if you are diagnosing on trunk, do not expect it.
 - **Sending the marker yourself.** It is a writable field on the public stock DTO and it appears in payload examples in the wild. A template that carries it as cleared latches every parent it touches.
 - **Enabling a second inventory source.** Parent maintenance is gated on the install being in single-source mode, and that is defined as *fewer than two enabled sources* — not two sources in use. A second enabled source assigned to nothing at all still switches parent maintenance off entirely, freezing every parent's stored status where it stands.
 
 On a multi-source install the source one is the most severe, not the mildest, because a second defect compounds it. The per-stock salability index for composite parents derives each secondary stock's answer partly from the parent's stored flag **for the default stock** — a value scoped to a different stock. Frozen flag plus that veto, on a parent created by an import and therefore starting out of stock, means the parent is unsalable in *every* stock and stays that way. On stock platform code, a multi-source catalogue loaded through the API has no buyable composite parents at all — variant, bundle or grouped; all three are affected, each through its own index query.
 
-The two defects also explain each other, which matters if you are tempted to patch one. The gate exists *because* of the veto: lift the gate alone and the recompute starts writing a correct default-scoped flag, which the veto then propagates into secondary stocks, marking parents unsalable in stocks whose children are fine. That is a known, still-reproducible regression. Either half alone is useless or harmful.
+The two defects also explain each other, which matters if you are tempted to patch one. The gate exists *because* of the veto: lift the gate alone and the recompute starts writing a correct default-scoped flag, which the veto then propagates into secondary stocks, marking parents unsalable in stocks whose children are fine. That is [magento/inventory#3350](https://github.com/magento/inventory/issues/3350), confirmed by measurement in August 2026: lifting the gate on current code reproduces it exactly. Either half alone is useless or harmful.
+
+Removing both is not available to the platform either, which is why this is still open. The veto is *also* how a merchant's manual out-of-stock on a parent reaches secondary stocks, and the stored marker cannot distinguish "the platform moved this" from "a person moved this" — it reads the same in both cases. The trade-off is written up in [magento/inventory#3466](https://github.com/magento/inventory/issues/3466). For an integration the practical consequence is simply that you cannot wait for a platform fix here; design the feed to avoid the state.
 
 Practical consequences:
 
-- **Send stock before creating parents.** Ordering is not a throughput preference here; it decides whether parents can ever become salable.
+- **Create parents together with their links or options, in one call.** This is the cheapest fix and it holds even when the children have no stock yet. If the feed cannot do that, send the parent with explicit stock data marking it in stock; either shape avoids the latch. Both are ordinary payload changes — no patch, no module, no repair run.
+- **Send stock before creating parents** if neither of the above is possible. Ordering is not a throughput preference here; it decides whether parents can ever become salable.
 - **Never send the automatic-status marker.** Strip it out of payload templates rather than echoing back whatever a read returned.
 - **On multi-source, verify that composite parents are salable at all** before launch, rather than assuming stock feeds will sort it out. Reconciling the stored flag is not sufficient on its own there.
 - **Repairing a stuck parent takes two steps:** restore the marker *and* re-derive the status. Restoring the marker alone only makes the next child write effective, which may never come.
