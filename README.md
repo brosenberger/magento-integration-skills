@@ -14,6 +14,7 @@ Agent skills for building a data integration against Magento 2 — an ERP, PIM o
 | `magento-integration-attributes` | Types, options, per-store labels, swatches, and why third-party attribute properties are usually unreachable |
 | `magento-integration-media` | Unbounded duplication, the global-gallery vs per-store-view-role split, deletion refusals |
 | `magento-integration-prices-stock` | Why these never belong in a product save, the opposite error models, salable vs source quantity |
+| `magento-integration-customers` | Accounts, addresses and groups: an unauthenticated create that also sends mail, mail that can only be discarded rather than deferred, an address update that destroys the row and everything referencing it, and group assignment a later address save reverses |
 | `magento-integration-categories` | The missing natural key, asymmetric assignment paths, removal, rewrite bloat |
 
 ## Install

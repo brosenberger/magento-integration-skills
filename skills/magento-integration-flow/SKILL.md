@@ -33,6 +33,11 @@ Overlap 1–4 with a second integrator only if they can avoid touching the same 
 
 ## Cross-cutting pitfalls
 
+**Scope is validated asymmetrically, and the silent half is the dangerous one.** Across entities, a value belonging to a *different* website tends to be rejected with a clear error, while an omitted scope or the admin scope is quietly rewritten to the default. The loud failure is the one caught in testing; the silent one reaches production. Measured on customers in `magento-integration-customers`, and the same shape recurs elsewhere.
+
+**A write that succeeds can still undo an earlier one.** Magento reacts to writes with observers and plugins that reassign what you just set - customer group assignment reversed by a later address save is the clearest example. Assume nothing you wrote is still there because the call returned `200`; read it back on the paths that matter.
+
+
 These recur in every family. Check each one per endpoint rather than assuming the API is consistent — it is not.
 
 - **Scope is decided by the route, silently.** A scopeless route does not mean "global"; on update it writes a store-level override that shadows the global value forever. Decide per attribute which scope it belongs to, and make the client fail rather than fall back when a scope lookup returns nothing.
