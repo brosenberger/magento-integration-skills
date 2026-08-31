@@ -35,6 +35,20 @@ Overlap 1–4 with a second integrator only if they can avoid touching the same 
 
 **Scope is validated asymmetrically, and the silent half is the dangerous one.** Across entities, a value belonging to a *different* website tends to be rejected with a clear error, while an omitted scope or the admin scope is quietly rewritten to the default. The loud failure is the one caught in testing; the silent one reaches production. Measured on customers in `magento-integration-customers`, and the same shape recurs elsewhere.
 
+**Payload types are per field, not per API.** The REST layer type-checks each value against that field's own declaration - the `@param` on the interface setter, or the `type` attribute on an extension attribute - and core is not internally consistent about which it uses for the same *kind* of value. Two boolean-looking flags on the same entity:
+
+```
+"is_subscribed": true                → accepted   (declared boolean)
+"disable_auto_group_change": true    → 400        (declared int)
+"disable_auto_group_change": 1       → accepted
+```
+
+So there is no rule to apply. "Send booleans as booleans" is wrong, and so is "send everything as 0/1". A client library that normalises flags one way will fail on roughly half of them, and the failures are per-field rather than per-entity, so partial success across one payload is normal.
+
+The saving grace is that this failure is **loud and informative** - `The "1" value's type is invalid. The "int" type was expected.` names the type it wanted. That is the opposite of the scope handling above, and the two together are the shape to expect: Magento tends to be strict and explicit about *types*, and silent and forgiving about *scope*. Trust a type error to tell you the answer; never trust a `200` to mean the scope you sent survived.
+
+When in doubt, read the declaration rather than guessing: the interface for native fields, `extension_attributes.xml` for extensions.
+
 **A write that succeeds can still undo an earlier one.** Magento reacts to writes with observers and plugins that reassign what you just set - customer group assignment reversed by a later address save is the clearest example. Assume nothing you wrote is still there because the call returned `200`; read it back on the paths that matter.
 
 
