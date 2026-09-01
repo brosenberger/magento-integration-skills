@@ -16,6 +16,8 @@ Agent skills for building a data integration against Magento 2 — an ERP, PIM o
 | `magento-integration-prices-stock` | Why these never belong in a product save, the opposite error models, salable vs source quantity |
 | `magento-integration-customers` | Accounts, addresses and groups: an unauthenticated create that also sends mail, mail that can only be discarded rather than deferred, an address update that destroys the row and everything referencing it, and group assignment a later address save reverses |
 | `magento-integration-categories` | The missing natural key, asymmetric assignment paths, removal, rewrite bloat |
+| `magento-integration-orders` | The poll loop: a change cursor that silently drops orders, state that only moves as a side effect, transitions that leave no trace, and the order lines that must not be summed |
+| `magento-integration-fulfilment` | Invoices, shipments, refunds and payment state: which routes validate and which persist anything, an over-ship that is silently clamped, calls that report success while doing nothing, and order injection that corrupts the inventory ledger |
 
 ## Install
 
@@ -50,7 +52,7 @@ Written alongside a series on [brocode.at](https://brocode.at/blog/) that carrie
 ## Caveats
 
 - Behaviour is current as of 2.4.8-p5. Several claims here contradict what was true in 2.3.x, and these claims will age the same way. Re-test after a major upgrade.
-- Customer and order coverage is deliberately absent: it has not been verified against a running install yet, and an unverified skill is worse than no skill.
+- Payment behaviour was measured against a stand-in gateway whose calls always succeed, so every effect recorded is Magento's own bookkeeping. Real providers differ from it and from each other — derive your own matrix from a test order per payment method.
 
 ## Licence
 

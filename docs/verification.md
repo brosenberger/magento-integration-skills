@@ -15,6 +15,10 @@ generated:
 verified:
   - by: magento2-sandbox (Magento Open Source 2.4.8-p5)
     at: 2026-08-25T00:00:00Z
+  - by: magento2-sandbox (Magento Open Source 2.4.8-p5, second website) — customer pass
+    at: 2026-08-31T00:00:00Z
+  - by: magento2-sandbox (Magento Open Source 2.4.8-p5) — order pass, stand-in gateway
+    at: 2026-09-01T00:00:00Z
 status: stable
 stale_after: 2027-02-25T00:00:00Z
 ---
@@ -45,6 +49,8 @@ The costly errors were never wrong *identifiers*, which review catches. They wer
 Each of these is widely repeated and was false on the tested version:
 
 - A queued bulk path requires a dedicated message broker. It does not; it ran end to end on the database queue with no broker installed.
+- There is no way to create an order for a known customer with an administrator credential. There is: cart creation for a customer is declared behind an ordinary permission, and the five-call cart sequence produces an order indistinguishable from a storefront one.
+- The product-side collection that appears only in read responses is ignored on write. It assigns; the same save handler seeds its working set from it.
 - The product-side category collection replaces the assignment set. It merges; only an empty collection clears.
 - Repeated imports accumulate duplicate attribute options. They are rejected outright.
 - An attribute value outside the entity's attribute set is written and merely hidden. It is not written at all.
@@ -62,11 +68,22 @@ An earlier version reported that the published API schema returned 45 paths rega
 
 The original request had almost certainly outlived its credential's short lifetime and was being served anonymously. Nothing in the response said so; it returned a valid schema, just a smaller one. **A successful response to an unauthenticated request looked exactly like a successful response to an authenticated one** — which is the same class of silent failure documented throughout these skills, and it survived one round of review before being caught.
 
+# The customer and order passes
+
+Both were executed after the initial pass, on the same install.
+
+**Customers**, with a second website added so multi-site behaviour could be measured rather than assumed, and source cross-checks against a development checkout: the anonymous create and the mail it triggers, three scope payloads, per-website uniqueness across two websites, both password validation failures, the address replace-and-recreate, group and tax-class discovery, group assignment requiring authentication, automatic group assignment reversing it, an extension-attribute round trip, newsletter consent both ways, and the customer grid before and after reindex.
+
+**Orders**, on Luma sample data with a single inventory source, offline payment and flat-rate shipping: the change cursor including two orders written inside one second, filter and sort failures on the order feed, every transition's effect on the change timestamp, the status-history table after a hold, an unhold and two cancels, four orders built specifically to expose the item-row rules including a bundle with a per-option quantity above one under a cart-wide rule, partial invoices and shipments, the over-ship clamp, the invoice-level refund crash at three quantities, tracking's effect on both change timestamps, and order injection through the repository routes with the reservation ledger read before and after.
+
+**Payments were measured against a stand-in gateway whose calls always succeed**, so what is recorded is Magento's own bookkeeping — `payment_action` at placement, the capture flag with and without, cancel and void at each stage. No real payment provider was exercised, and the skill says so where it matters.
+
 # Not tested
 
 Stated explicitly, because silence reads as coverage:
 
-- **Customer and order behaviour.** Not executed at all. No skill covers them.
+- **Real payment providers.** Redirect, push and review flows, partial-capture capability, and anything a provider module does inside placement. The per-method test pass in `magento-integration-fulfilment` exists because this cannot be generalised.
+- **Two product-write hazards carried from the earlier gap survey** — a global-scope update assigning every website, and a store-scoped update pinning every attribute — are upstream reports rather than findings from this pass, and are marked as such in `magento-integration-catalog-structure`.
 - **Deadlocks under parallel writers.** Deliberately provoked with 256 concurrent overlapping writes and **not reproduced** — which says the sandbox is too small, not that the problem is gone.
 - **Behaviour at catalog scale.** Rewrite growth and reassignment cost need a catalog far larger than sample data.
 - **Reservation behaviour under concurrent orders.** Needs order traffic this pass did not generate.
