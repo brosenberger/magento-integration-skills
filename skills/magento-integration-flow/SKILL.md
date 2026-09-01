@@ -6,7 +6,7 @@ description: >-
 
 # magento-integration-flow — sequencing a Magento data integration
 
-Orchestration skill. Decides **what to build in which order** and encodes the failure modes that recur across every endpoint family. Delegates per-family specifics to the group skills: `magento-integration-catalog-structure`, `-attributes`, `-media`, `-prices-stock`, `-categories`.
+Orchestration skill. Decides **what to build in which order** and encodes the failure modes that recur across every endpoint family. Delegates per-family specifics to the group skills: `magento-integration-catalog-structure`, `-attributes`, `-media`, `-prices-stock`, `-categories`, `-customers`, `-orders`, `-fulfilment`, and the cross-cutting read path to `-querying`.
 
 Deliberately agnostic about transport and language. Nothing here assumes a particular client, framework, or whether calls are made synchronously, batched, or queued.
 
@@ -26,8 +26,8 @@ Sequence by **who is unblocked**, not by what is easiest.
 2. **Media** — separable, and deliberately on a slower cadence than everything else. Photographs do not change nightly.
 3. **Prices and stock** — the narrow endpoints. Cheap, frequent, and the wrong thing to do with a full product save.
 4. **Categories** — the tree can be attached after the catalog is loaded and reviewed flat.
-5. **Customers** — unblocks logged-in behaviour, and is what makes tier pricing testable.
-6. **Orders** — depends on both and blocks nobody on the shop side. Also where the traffic reverses: everything above pushes *into* Magento, orders mostly push status *out*.
+5. **Customers** — unblocks logged-in behaviour, and is what makes tier pricing testable. `magento-integration-customers`.
+6. **Orders** — depends on both and blocks nobody on the shop side. Also where the traffic reverses: everything above pushes *into* Magento, orders mostly push status *out*. The poll loop and the write-back are `magento-integration-orders`; the documents, payment state and order creation are `magento-integration-fulfilment`.
 
 Overlap 1–4 with a second integrator only if they can avoid touching the same products.
 
@@ -56,6 +56,7 @@ These recur in every family. Check each one per endpoint rather than assuming th
 
 - **Scope is decided by the route, silently.** A scopeless route does not mean "global"; on update it writes a store-level override that shadows the global value forever. Decide per attribute which scope it belongs to, and make the client fail rather than fall back when a scope lookup returns nothing.
 - **There is no API-wide error contract.** Some families report per-item failures and apply the good rows; some take the whole batch or none; some accept bad data silently and persist it. Establish the model per family *before* writing retry logic.
+- **The shape of a route predicts whether it validates.** A route named after a collection of entities is usually a repository save that persists whatever it is handed; one that hangs off a single entity and names an action is usually the domain service that validates, transitions and keeps side effects honest. Both are declared and both return success. Worked out in full for sales documents in `magento-integration-fulfilment`, where the repository routes accept orders that cannot exist — but check it wherever two routes look like alternatives for the same job.
 - **A success status does not mean the data was stored.** Several endpoints accept a payload, return success, and write nothing. Read back what matters instead of trusting the response.
 - **Idempotency is per-endpoint, not per-API.** Adjacent endpoints doing the same conceptual job differ: one upserts, its neighbour fails when the thing already exists. Write retry handling per call.
 - **Failure messages carry unresolved placeholders.** The human-readable string frequently omits the value; the value sits in a structured parameters field. Log the structured field or the log is useless.
@@ -64,6 +65,26 @@ These recur in every family. Check each one per endpoint rather than assuming th
 - **Indexer mode decides the runtime.** Update-on-save turns every write into a reindex. Schedule mode plus a drain is the difference between one hour and nine.
 - **A generic failure message is a wrapper, not a cause.** Repositories catch and re-throw as "could not save", discarding nothing but telling you nothing either. The original is attached underneath — read the wrapped exception before changing any code. Guessing at fixtures, permissions or configuration because the top-level message was vague costs hours that one unwrap would have saved.
 - **"The indexer has not caught up" is the most over-used diagnosis in this platform.** Some values are computed at read time and genuinely need an index; others are stored flags that something is supposed to recompute and did not. Reindexing cannot repair a stale stored flag — the index will faithfully reproduce it. Establish which kind you are looking at before scheduling a reindex.
+
+## Throughput, and the failures that are not in the API
+
+- **A queued bulk path does not require a dedicated message broker.** This is the most repeated wrong thing about it: the consumer declares no connection and falls back to the database queue unless a broker is configured, and a full queued import ran end to end on a store with no broker installed at all. That was true in an older major version and stopped being true; assuming otherwise blocks imports on infrastructure nobody needs. A broker is still the better choice under real load — it is not a precondition.
+- **The consumer has to actually be running.** Cron starts it in most deployments; one started by hand dies with the terminal. Run it supervised with a message cap so it recycles, and remember that a stalled consumer looks exactly like a slow import for hours.
+- **The queued path carries the scope trap at bulk scale.** A scopeless queued route writes the same silent default-store override as its synchronous counterpart. Put the scope in the route there too.
+- **Indexer mode decides the runtime.** Beyond schedule-versus-save: the change-log tables grow to millions of rows during a large run and cron has to drain them, and for a full replacement it is often faster to turn indexing off entirely, import, and reindex once. Cache invalidation lands at the end regardless, so schedule imports away from traffic peaks and warm afterwards.
+- **Parallel writers deadlock.** Writers touching the same entity, index and rewrite tables produce lock-wait failures. Partition work by a hash of the entity key so one entity is only ever touched by one worker, cap concurrency low and measure — past the deadlock threshold, more workers *reduce* throughput — retry the deadlock error with jittered backoff, since unlike a validation failure it is legitimately retryable, and never run two imports of the same catalog concurrently. **Honest limit:** a deliberate attempt to provoke this on a small sandbox produced no deadlock at all, so treat it as sound practice that one verification pass could not reproduce a failure for rather than as measured behaviour.
+- **The API shares the storefront's process pool** unless it is separated. A hot import can take the shop down while every Magento metric looks healthy. Give the API its own pool.
+
+## Not everything has an API
+
+Before designing around an endpoint, check it exists — and expect the gaps to cluster in one place. **The data plane is well covered; the control plane largely is not.** Configuration, cache and index control, admin users and roles, website and store-view creation, email templates, widgets and import profiles have no write surface. Neither do catalog price rules, which catches promotions work specifically because *cart* price rules do exist. A couple of merchant-facing features built before the API-first era — wishlists, reviews — have no REST surface but do have a GraphQL one.
+
+Two consequences:
+
+- **Check REST, then GraphQL, then accept it is configuration or CLI.** A feature added after the storefront moved to GraphQL often landed there instead, and a feature older than both landed in neither.
+- **Scoped configuration cannot be reset over the API at all**, and the CLI can set but not unset it. That is the configuration-level relative of the attribute-scope reset in `magento-integration-catalog-structure`.
+
+Where a gap blocks the work, the supported answer is a small module declaring its own route over an existing service — not a database write, and not a CLI shelled out from an integration.
 
 ## Access, before anything else
 

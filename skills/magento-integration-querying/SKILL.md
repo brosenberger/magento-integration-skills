@@ -26,7 +26,13 @@ Two consequences that follow directly:
 
 Two operators are easy to miss because most write-ups omit them: a **negated set-membership** test for multi-value fields, and a **greater-or-equal variant** that exists alongside the usual comparison family. Both are implemented in the query builder. Worth knowing before writing a client-side filter to compensate for one you assumed was missing.
 
+**The parameter names in the URL are not the names in code.** The query form uses underscores; the object form used in application code uses camel case, and most published examples show the second. Pasting a camel-cased name into a query produces either a silent no-filter — every row returned, looking like a filter that matched everything — or a validation failure, depending on version. This is the first thing to check when a count comes back higher than expected.
+
+**A collection read needs at least one criteria key present.** With none at all the request fails rather than defaulting to everything, and the message ships with its placeholder unresolved. Always send a page number at minimum.
+
 One documented limit applies everywhere: **only top-level fields are searchable.** Anything nested behind an extension or custom-attribute container cannot be filtered on directly, and attempting it fails as a storage-layer error naming a column rather than as a validation message — which reads like a bug in your query rather than an unsupported operation.
+
+The same shape catches EAV attributes: an attribute reachable in the flattened form of the entity filters normally, and one that is not produces a storage-layer complaint about a missing column. Where an attribute genuinely has to be filtered on, the search-engine-backed endpoint or a GraphQL query answers it; filtering client-side after reading everything does not scale, and rebuilding the flat form to include the attribute is a store-wide decision rather than an integration one.
 
 ## Reads that silently do nothing
 
@@ -55,7 +61,7 @@ Also worth knowing: paging past the end of a result set does not always behave a
 Reads are cheap individually and expensive in aggregate. Two rules that survive contact with a real catalog:
 
 - **Do not read one entity at a time to decide whether to write it.** Two calls per entity to avoid one unnecessary write is a bad trade at volume. Hash the payload on your side and skip rows whose hash has not changed since the last successful run.
-- **Request only the fields you need** where the API supports narrowing the response. Full entity payloads at catalog scale dominate transfer time and memory.
+- **Request only the fields you need** where the API supports narrowing the response. Full entity payloads at catalog scale dominate transfer time and memory. Two mechanics worth knowing: the projection is **not part of the filter model** — it is its own parameter and combines with the criteria freely, despite a long-standing report that they cannot be used together — and on a **list** endpoint the projection has to name the collection wrapper and the total, not the entity's own fields, or it returns nothing useful. On a single-entity route the same names are flat. This is the highest-value parameter on the read path for a two-stage poller: a cheap change-detection sweep, then a full fetch of only what changed.
 
 The exception is media, where reading before writing genuinely pays — see `magento-integration-media`.
 
@@ -68,6 +74,7 @@ The exception is media, where reading before writing genuinely pays — see `mag
 ## Anti-patterns
 
 - Assuming a filter or sort applied because the response was successful.
+- Camel-cased criteria names in a URL.
 - Nesting logic that the filter model cannot express, then trusting the result.
 - Offset paging over a set being written to concurrently.
 - Reading each entity before writing it.

@@ -31,6 +31,9 @@ Scope is chosen at definition time and is effectively permanent: changing it lat
 - **The label set is replace-all, and this is where translations get destroyed.** Sending labels for one store view on an option update *deletes every store view you omitted*, and the call succeeds. Updating, adding and removing a translation are therefore the same operation with the same rule: **read the option's current label set, change it, and send it back whole.** Removing one translation means sending the others without it; an empty label removes the row rather than blanking it. Never assemble that set from what the feed happens to know — that is exactly how one language disappears while another is updated.
 - **Creating an option that already exists fails.** Duplicate labels are rejected rather than silently accumulating, which protects the option set but makes option creation **non-idempotent**: a retried batch fails on everything that already landed. Treat "already exists" as the success case on a re-run.
 - Option creation on a swatch-style attribute produces an option with no swatch value — structurally present, visually blank, with no error. Detecting this needs a check for empty swatch data, not for missing records.
+- **The text shown on a text swatch is a different per-store row from the option's label set.** Setting the labels alone leaves the swatch itself showing the admin value, in every store view.
+- **Changing an attribute's swatch input type on a populated attribute orphans the swatch rows it already has.** That is a migration, not a configuration toggle — the same class of decision as scope, and equally permanent.
+- A swatch attribute used for variants must be globally scoped *and* flagged for use in listings. Miss the second and the swatch renders on the product page but not on category pages, which reads as a theme bug.
 
 ## Updating the attribute itself
 

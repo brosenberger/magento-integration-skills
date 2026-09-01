@@ -18,6 +18,8 @@ Everything below follows from that.
 
 Hardcoding a category identifier — in config, in the external system, or in a mapping file — is the defining mistake of category integration. It does not fail loudly. It assigns products to a plausible-looking wrong category after the next environment refresh.
 
+Resolving that key needs the listing endpoint to filter on a custom attribute and to honour a page size. **Both were broken for years and both work on 2.4.8-p5** — a global-scope custom attribute filtered correctly and returned one category, and page sizes were honoured against a tree of 37. Re-test on your own version rather than assuming, since this is a patch-level observation about two defects, not a guarantee. The fallback if either regresses is unchanged: pull the tree once in a single read and build the map client-side.
+
 ## Assignment has two paths with different semantics
 
 - **From the product side**, as part of a product write: convenient, and the wrong default for a feed.
@@ -26,6 +28,8 @@ Hardcoding a category identifier — in config, in the external system, or in a 
 The asymmetry that catches people: **a product-side array does not express removal.** Sending a shorter list is not a deletion — the assignments that are missing from it simply stay. Sending an empty list, however, removes everything, including whatever a merchandiser curated by hand.
 
 So assignments only ever accumulate unless you remove them explicitly, and the only blunt instrument available removes far too much.
+
+**An anti-fact worth carrying explicitly:** the product-side array is widely described as *replacing* the assignment set, and an assignment collection that appears only in read responses is widely described as being *ignored* on write. Both are wrong on 2.4.8-p5 — the array merges, and that second collection does assign, because the same save handler seeds its working set from it. Prefer the documented collection anyway, since it is the one that carries position; just do not spend a day debugging the other on the assumption that it is a no-op.
 
 ## Removal is its own operation, and it is not idempotent
 
@@ -44,6 +48,7 @@ Define the subtree the feed owns and diff only within it. The external system kn
 - **Category names and slugs are scope-dependent.** Creating categories through a scoped route rather than a global one yields a tree that is right in one store view and wrong in the rest.
 - **Deleting a category cascades** to its children and unassigns every product beneath. There is no dry run. A hierarchy renumbering that triggers deletes can remove a subtree in one call.
 - **Rewrite rows multiply with assignments.** Reassigning categories across a large catalog regenerates them all and is usually the slowest part of the whole import.
+- **The storefront lags every assignment change.** The category-product relation and its per-store index have to rebuild before a page reflects it; under scheduled indexing that is cron latency, and the category page is stale until then. Do not read that as a failed write.
 
 ## Reading assignments back
 

@@ -94,6 +94,10 @@ Practical consequences:
 - **On multi-source, verify that composite parents are salable at all** before launch, rather than assuming stock feeds will sort it out. Reconciling the stored flag is not sufficient on its own there.
 - **Repairing a stuck parent takes two steps:** restore the marker *and* re-derive the status. Restoring the marker alone only makes the next child write effective, which may never come.
 
+Upstream, for tracking whether this changes under you: the single-source half is [magento/magento2#41174](https://github.com/magento/magento2/issues/41174) with a proposed six-line fix in [PR #41175](https://github.com/magento/magento2/pull/41175) — a composite's implicitly created stock record starting under automatic control — so it may well be fixed in a future release. The multi-source half is a design trade-off rather than a defect ([magento/inventory#3466](https://github.com/magento/inventory/issues/3466)), with regression coverage for the gate proposed in [PR #3467](https://github.com/magento/inventory/pull/3467). Do not wait for either; design the feed to avoid the state. [BroCode_CompositeStockStatus](https://github.com/brosenberger/module-composite-stock-status) carries both halves plus a repair command for a catalogue already in the state, and documents the one behaviour it changes — a merchant's manual out-of-stock on a parent no longer propagates to secondary stocks.
+
+One more state that is not the latch and looks like it: **an entity created with no stock data at all is stored out of stock.** Where the store is configured to hide out-of-stock products, an entire freshly imported catalogue is invisible with nothing wrong anywhere. Check that setting before diagnosing anything else.
+
 The older checklist still applies underneath — children created before their quantities, a source not linked to the stock the website sells from, disabled or off-website children, outstanding reservations — but check the parent's own stored flag before any of them.
 
 ## Verification

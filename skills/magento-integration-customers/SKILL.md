@@ -18,6 +18,8 @@ Group skill under `magento-integration-flow`. Agnostic of client and transport.
 
 Closing it is a small module that redeclares the route with a management ACL. Verified to work: anonymous is refused afterwards, an authenticated integration is not. Resources merge rather than replace, so the refusal names both the old and new requirement.
 
+It is not the only unauthenticated route on this entity. **The password-reset trigger is also anonymous**, so an unauthenticated caller can make the shop mail any address it holds — that one core does throttle, by address and origin within a window, so the mail vector is capped where account creation is not. Know which of the two you are looking at before concluding the surface is hardened.
+
 **Creation always notifies.** Omitting the password does not silence it — it selects a "set your password" variant instead of the welcome one. There is no quiet-create path: the only method that saves a customer without notifying is the repository save, whose sole route is the update for a customer that already exists.
 
 **Setting a group requires authentication**, even though creation does not. Supplying a group id flips the same route to demanding a management ACL — sensible, or anyone could self-assign into a wholesale group. So any real integration authenticates, and "the create endpoint needs no token" is only true for the trivial case.
@@ -65,6 +67,8 @@ Addresses are EAV, so carrying your own key as a custom attribute needs no code 
 Two smaller ones: several addresses flagged default resolve last-one-wins with no error, and an address supplied at creation does not become the default unless flagged.
 
 ## Groups and tax classes
+
+**There is no address search.** Core exposes no endpoint that queries addresses, and address fields are not top-level on the customer, so they cannot be filtered on either — reconciling an external key means fetching the customer and matching client-side. Plan the reconciliation around customer-level reads, not around a lookup that does not exist.
 
 **Discover them, do not hardcode.** Group search returns every group with its tax class identifier and name, and the default group is readable per store. Identifiers are conventional on a fresh install and wrong on a real one.
 

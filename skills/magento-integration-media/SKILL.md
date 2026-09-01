@@ -40,6 +40,12 @@ Correct move: **reassign the role to the replacement image**, which overwrites t
 
 Note also that the protective refusal may be conditional on the product being visible in more than one scope. Do not assume it always fires; verify on your own store topology.
 
+## The one family whose success response can be trusted
+
+Worth stating because it is the exception in this set: **the media endpoints have the cleanest error model of any family here** — conventional status codes, specific messages, no unresolved placeholders, and nothing accepted silently. An unknown entity, content that is not valid encoded data, and a declared type that disagrees with the bytes all fail loudly and specifically. A success here really did what it said, which is not true of the stock path or of variant option writes.
+
+The exception inside the exception is the cross-scope role deletion above, which is a scope problem rather than an error-model one.
+
 ## Verification
 
 - Re-run and confirm no new files, no new gallery records.
