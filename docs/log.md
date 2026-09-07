@@ -86,3 +86,11 @@ Audited all eight skills against the article cluster they were written from. The
 ### Documentation
 
 - Skill set, README and verification updated: eight skills became ten, and the "customer and order coverage is deliberately absent" caveat is retired
+
+## 2026-09-07 — the enablement value that is not an option
+
+A field report rather than an audit: an integration writing `0` for "inactive" through the product endpoint. Reproduced on the same 2.4.8-p5 sandbox, on a two-website install.
+
+- `catalog-structure`: new section on enumerated attributes not being validated on the way in — out-of-range values for enablement, visibility and a country code were all accepted and stored. Recorded with the three-way pile-up that makes enablement the expensive case: the invalid value is the one an unmapped boolean produces, website scope fans a single scoped write across every store view of that website, and only the enabled value counts as enabled, so the disable half of a feed passes acceptance while the enable half silently stops working. Plus the blank admin cell that hides it and the fact that the admin cannot produce the state at all.
+- `catalog-structure`: **corrected** the scope-reset rule. It said inheritance could not be restored through a normal write. An explicit `null` on a scoped route deletes the scoped record — measured on a numeric attribute, an optional text attribute and a required one — while an empty string writes a record holding a database NULL. The sentinel-and-extension advice that stood in for a reset is now scoped to file-import transports, where it is still true. Added the matching hazard: the same `null` at *default* scope is rejected for a required attribute but not for an optional one, and deleting an optional attribute's default record splits reads from indexers — reads report the attribute's declared default, indexers that join the default record drop the entity.
+- `attributes`: one line, since the identifier-not-label rule now has a consequence — nothing verifies the identifier when a product is written, so the external-value-to-identifier map has to be validated client-side.

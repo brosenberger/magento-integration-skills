@@ -78,6 +78,12 @@ Both were executed after the initial pass, on the same install.
 
 **Payments were measured against a stand-in gateway whose calls always succeed**, so what is recorded is Magento's own bookkeeping — `payment_action` at placement, the capture flag with and without, cancel and void at each stage. No real payment provider was exercised, and the skill says so where it matters.
 
+# The enablement-value pass
+
+Executed 2026-09-07 on the same install, on a two-website topology (three store views on one website, one on the other), prompted by a field report rather than by an audit.
+
+Measured: `catalog_eav_attribute.is_global` for the enablement attribute; four out-of-range writes across two typed scalars, one custom attribute and one bogus option reference, all accepted and stored; the fan-out of a single store-view-scoped write across a website; a default-scope write failing to clear those records; per-store reads across both websites; a price reindex with the invalid value and with the legitimate disabled value, on the affected website and the untouched one; both reset payloads (`null` and empty string) on a numeric, an optional text and a required text attribute, at store-view and at default scope; and a reindex after the default record was removed. Source was read only to explain results already observed — the source model's option list, the grid column's label lookup, and the indexer's join type. Probe products were removed afterwards.
+
 # Not tested
 
 Stated explicitly, because silence reads as coverage:

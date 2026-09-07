@@ -1,7 +1,7 @@
 ---
 name: magento-integration-catalog-structure
 description: >-
-  Use when an external system creates or updates Magento 2 products — the structural half of a catalog feed. Covers scope fallback, what "partial update" really means, variant sequencing, product types, link replacement, a business key with no unique constraint, rewrite bloat, reproducing a category listing, and the writes that report success and store nothing. Part of the `magento-integration-*` group.
+  Use when an external system creates or updates Magento 2 products — the structural half of a catalog feed. Covers scope fallback, partial-update semantics, variant sequencing, product types, link replacement, a non-unique business key, rewrite bloat, reproducing a category listing, unvalidated enumerated values, and the writes that report success and store nothing. Part of the `magento-integration-*` group.
 ---
 
 # magento-integration-catalog-structure — products, variants and the silent writes
@@ -17,9 +17,11 @@ The route decides which scope a write lands in, and the unscoped form is not "gl
 - Never let the client fall back to an unscoped route because a scope lookup returned nothing. Fail the entity instead.
 - Know which attributes are scope-dependent before you start. The grouping is not intuitive — display text is usually per store view, commercial values usually global, and enablement is often per website rather than per store view, so "disable in one store view" may not be expressible at all.
 
-**There is no way to un-set a scoped override through a normal write.** Sending an empty value writes an empty value; repeating the global value creates a permanently divergent copy. Restoring inheritance requires deleting the scoped record, which is a distinct operation.
+**Restoring inheritance means deleting the scoped record, not writing over it.** Repeating the global value creates a permanently divergent copy, and sending an *empty* value writes an empty value — which pins "no value" on that scope rather than clearing it. The write that actually deletes is an explicit **null**, and it is the API's equivalent of the admin's *use default* control. Measured on 2.4.8-p5: `null` on a scoped route removed the scoped row for a numeric attribute, an optional text attribute and a required one alike, while `""` on the same text attribute left a row behind holding a database NULL.
 
-Avoid creating the override in the first place: keep an explicit allowlist of scope-dependent attributes and refuse to write anything else through a scoped route. Where a reset is genuinely needed, it can be added — the platform's own import tooling already defines a sentinel meaning "no value", and a small extension can make a write carrying that sentinel delete the scoped record the way the admin's *use default* control does. Two things to know before building it: the value that triggers the delete is **not the same for every entity type**, and sending the wrong one writes an empty record instead of deleting, which pins "no value" on that scope silently. And the obvious extension point is sometimes wrong — some repositories serialise the entity they are handed, discard it, and repopulate a freshly loaded one, so anything set at that layer is thrown away.
+**Send that null only on a scoped route.** At default scope the same payload targets the *default* record. A required attribute is protected — the save is rejected because the value would be empty — but an optional one is not, and deleting its default record leaves the entity with no stored value at all. What follows is a read/index split: entity reads fall back to the attribute's declared default and report a perfectly normal value, while indexers that join the default record directly drop the entity outright. Nothing reports an error, and the next ordinary save writes the record back and erases the evidence.
+
+Better still, avoid creating the override at all: keep an explicit allowlist of scope-dependent attributes and refuse to write anything else through a scoped route. A reset you never need is one you cannot get wrong. Note that other transports express the reset differently — the platform's file-import tooling uses a sentinel string meaning "no value" rather than a null, the sentinel is **not the same for every entity type**, and sending the wrong one writes an empty record instead of deleting. Confirm the reset token per transport before relying on it.
 
 ### Two scope-shaped write hazards, reported rather than measured here
 
@@ -27,6 +29,26 @@ Both are long-standing upstream reports rather than findings from this verificat
 
 - **A global-scope update can assign the product to every website in the installation** ([magento/magento2#11324](https://github.com/magento/magento2/issues/11324), root cause reported still present in [#30316](https://github.com/magento/magento2/issues/30316)) — with no website list in the payload, and regardless of what the product was scoped to before. Invisible on a single-website store; on a store where catalogues are deliberately split it turns a routine bulk metadata update into a live incident. **Read the product first and re-send its current website assignment on every write**, whether or not the assignment is changing.
 - **A store-scoped update may pin *every* attribute at that scope, not the one you sent** ([#39498](https://github.com/magento/magento2/issues/39498), reported December 2024 at the highest severity). The entity is hydrated from storage before saving and cannot distinguish "this came in the payload" from "this came from the database", so the whole object is written at the scope in the route and every inherited value silently becomes an override. That makes a partial store-scoped write structurally unsafe: send everything explicitly, or keep translated writes out of the integration and let a migration own them.
+
+## Enumerated attributes are not validated on the way in
+
+**A select attribute's option list is documentation, not a constraint.** Values that correspond to no option are accepted, return success, and are stored verbatim — measured on 2.4.8-p5 with an out-of-range enablement value, an out-of-range visibility, and a country code that is not a country. This holds whether the field is a typed scalar on the product interface or a generic attribute in the custom-attribute bag; nothing on this route consults the source model.
+
+The damage is not evenly distributed. It concentrates on **enablement**, because three things line up:
+
+- **The value most integrations reach for is the invalid one.** Enablement is `1` for on and `2` for off. There is no `0`. An external system carrying an `active` boolean, cast rather than mapped, emits `0` for inactive — which is neither of the two legal values.
+- **Enablement is website-scoped, so the mistake fans out.** One scoped write does not write the store view in the route; it writes every store view of that store view's website. A single request plants the invalid value across the whole website.
+- **Only `1` counts as enabled, so the mistake looks like it worked.** The invalid value and the legitimate "off" value are indistinguishable on the storefront and in the price index. The feed reports success, the product disappears, and the disable half of the integration passes acceptance.
+
+**The failure surfaces on the way back up.** Writing the enabled value at *default* scope does not repair it, because the scoped records still shadow it — so "activate this product for the website" runs clean and changes nothing a customer can see, indefinitely. The scoped records have to be deleted, per the reset rule above.
+
+And it is invisible where people look for it. The admin renders an unmatched select value as a **blank cell**, not as the value and not as a label — there is no "Disabled" to spot, and no clue an override exists. The admin also cannot *create* the state: its form is built from the same source model and can only ever offer the legal values. This is an API-only condition, which is why nobody on the merchant side recognises it.
+
+In the client:
+
+- **Map, never cast.** `active ? 1 : 2`. An integer cast of a boolean is the bug.
+- **Validate every enumerated value against its option list before sending**, since the API will not.
+- **Reconcile against storage, not against a read.** Select the attribute's value rows where the value is outside the legal set. A read at default scope will report the healthy default and tell you nothing.
 
 ## "Partial update" is partial only for scalars
 
@@ -114,6 +136,7 @@ Query mechanics — filter combination, paging while writing, detecting a sort t
 - Re-run and confirm the second run changes nothing.
 - Read back a sample per product type, not just per product.
 - Check for scoped overrides on attributes that should be global — those are the silent fallback in action.
+- Select the value rows for every enumerated attribute you write and assert each value is in its option list. Out-of-range values are stored without complaint and are invisible to a read at default scope.
 - Confirm variant parents actually have children attached and are buyable.
 - Group by the business key and count. Anything above one is the concurrent-create race, and it is the only check that finds its silent half.
 - Watch rewrite row counts across runs; unbounded growth means names or assignments are churning.
@@ -127,3 +150,5 @@ Query mechanics — filter combination, paging while writing, detecting a sort t
 - Round-robin partitioning of a feed that can mention one entity twice.
 - Treating a timed-out write as failed rather than as unknown.
 - Letting the platform derive the URL key from a name the external system owns.
+- Casting a source-system boolean into an enumerated attribute instead of mapping it to a declared option.
+- Trying to undo a scoped override by writing the desired value at default scope.
