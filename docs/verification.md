@@ -19,6 +19,8 @@ verified:
     at: 2026-08-31T00:00:00Z
   - by: magento2-sandbox (Magento Open Source 2.4.8-p5) — order pass, stand-in gateway
     at: 2026-09-01T00:00:00Z
+  - by: magento2-sandbox (Magento Open Source 2.4.8-p5, two websites) — queued write path and scope-hazard pass
+    at: 2026-09-09T00:00:00Z
 status: stable
 stale_after: 2027-02-25T00:00:00Z
 ---
@@ -78,6 +80,24 @@ Both were executed after the initial pass, on the same install.
 
 **Payments were measured against a stand-in gateway whose calls always succeed**, so what is recorded is Magento's own bookkeeping — `payment_action` at placement, the capture flag with and without, cancel and void at each stage. No real payment provider was exercised, and the skill says so where it matters.
 
+# The queued write path pass
+
+Executed 2026-09-09 on the same install, two websites, message queue on the database with no broker, prompted by the observation that the set covered the queued path's infrastructure and none of its result contract.
+
+Measured: the receipt returned by both the batch and the single-item queued routes, and its per-item entries; a byte-identical batch re-posted and accepted again into a new batch identifier with unchanged content hashes; a two-item batch with one mistyped field rejected whole, with the valid item confirmed absent afterwards; a two-item batch with one well-typed but nonexistent reference accepted, then completing one operation and failing the other; all four status routes read as an administrator before and after draining the consumer; the created entity recovered from the detailed view's result payload while that view's own entity-identifier and entity-link fields stayed empty; the operation-search route returning operations rather than batches; the same three status routes refused to a catalog-scoped administrator credential that had just pushed a batch successfully, naming an action-log resource; the error code on three unrelated failure causes; and the empty start timestamps on queued-but-unconsumed operations. Probe products, the two probe accounts and the probe role were removed afterwards.
+
+Source was read only to explain results already observed: the two cron jobs that sweep interrupted operations and expire batch records, the configured retention default, and the absence of any retry route. Both are marked as source-read where they appear in the skill.
+
+# The scope-hazard pass
+
+Executed the same day, prompted by an incidental observation during the queued-path pass. Both of the product-write hazards the set had been carrying as unverified upstream reports were run.
+
+**The website fan-out reproduced, on create only.** Product creates were run through four routes on a two-website install: the all-scope route with no website list landed in both websites, the same route with an explicit list of one was respected, and the scopeless route and both store-view routes each landed in exactly one website. The **update** half of that report did not reproduce — a name-only update through the all-scope route left a single-website assignment untouched, as did the scopeless one.
+
+**The store-scoped attribute pinning did not reproduce.** A probe product was created with sixteen populated attributes across four value tables, all global, then updated through a store-view route with only a name in the payload. Exactly one scoped record was written: the name. Nothing else moved. The limits are worth stating — one simple product, one attribute set, one attribute in the payload, no pre-existing store overrides — so this is recorded as not reproduced rather than as fixed.
+
+A different artifact did surface and was isolated with a control: date-typed attributes gain empty records at every store view on any update, including store views the route never addressed. Running the same update through the scopeless route produced the same records, which is what rules out the reported mechanism. Probe products and the probe account were removed afterwards.
+
 # The enablement-value pass
 
 Executed 2026-09-07 on the same install, on a two-website topology (three store views on one website, one on the other), prompted by a field report rather than by an audit.
@@ -89,7 +109,9 @@ Measured: `catalog_eav_attribute.is_global` for the enablement attribute; four o
 Stated explicitly, because silence reads as coverage:
 
 - **Real payment providers.** Redirect, push and review flows, partial-capture capability, and anything a provider module does inside placement. The per-method test pass in `magento-integration-fulfilment` exists because this cannot be generalised.
-- **Two product-write hazards carried from the earlier gap survey** — a global-scope update assigning every website, and a store-scoped update pinning every attribute — are upstream reports rather than findings from this pass, and are marked as such in `magento-integration-catalog-structure`.
+- **The store-scoped attribute-pinning report, outside the shape tested.** It did not reproduce on a simple product with one attribute in the payload and no pre-existing store overrides; other product types, attribute sets and payload shapes were not tried.
+- **The retriably-failed state in normal operation.** What produces it other than an interrupted consumer, and whether re-sending after one is safe per family, were not exercised. Neither was the rejected state, which requires a publish-time failure.
+- **Batch expiry observed end to end.** The retention default and the cleanup job's lack of a status filter were read from the shipped configuration and the job, not watched deleting a batch.
 - **Deadlocks under parallel writers.** Deliberately provoked with 256 concurrent overlapping writes and **not reproduced** — which says the sandbox is too small, not that the problem is gone.
 - **Behaviour at catalog scale.** Rewrite growth and reassignment cost need a catalog far larger than sample data.
 - **Reservation behaviour under concurrent orders.** Needs order traffic this pass did not generate.

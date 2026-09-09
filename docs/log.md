@@ -94,3 +94,31 @@ A field report rather than an audit: an integration writing `0` for "inactive" t
 - `catalog-structure`: new section on enumerated attributes not being validated on the way in — out-of-range values for enablement, visibility and a country code were all accepted and stored. Recorded with the three-way pile-up that makes enablement the expensive case: the invalid value is the one an unmapped boolean produces, website scope fans a single scoped write across every store view of that website, and only the enabled value counts as enabled, so the disable half of a feed passes acceptance while the enable half silently stops working. Plus the blank admin cell that hides it and the fact that the admin cannot produce the state at all.
 - `catalog-structure`: **corrected** the scope-reset rule. It said inheritance could not be restored through a normal write. An explicit `null` on a scoped route deletes the scoped record — measured on a numeric attribute, an optional text attribute and a required one — while an empty string writes a record holding a database NULL. The sentinel-and-extension advice that stood in for a reset is now scoped to file-import transports, where it is still true. Added the matching hazard: the same `null` at *default* scope is rejected for a required attribute but not for an optional one, and deleting an optional attribute's default record splits reads from indexers — reads report the attribute's declared default, indexers that join the default record drop the entity.
 - `attributes`: one line, since the identifier-not-label rule now has a consequence — nothing verifies the identifier when a product is written, so the external-value-to-identifier map has to be validated client-side.
+
+## 2026-09-09 — the queued path had infrastructure and no result contract
+
+An audit prompted by a question rather than a field report: the set covered whether the queued path *runs* and said almost nothing about what it *returns*.
+
+### The new skill
+
+- New `magento-integration-async-bulk`: the receipt that replaces the entity response — a batch identifier and per-item entries carrying only a positional index, a content hash and an accepted flag, with correlation therefore positional and the caller's to maintain; the content hash not being an idempotency key, so a byte-identical batch replays; **structural validation still synchronous and all-or-nothing for the whole batch** while business validation defers per item, which is the half of this most descriptions get backwards in both directions; the four status routes and what each is actually for, including the operation-search route listing operations rather than batches and the detailed view being the only place the created entity comes back; the two correlation fields that stay empty on every create; **the status routes guarded by an action-log resource unrelated to the write**, so a catalog-scoped credential pushes a batch and is then refused its own receipt; the error code being zero on every failure cause; nothing retrying a failed operation and no route to ask for one; an operation with no consumer staying open forever while the sweeper that exists only touches interrupted work; and batch records expiring on a timer that ignores state, taking the evidence with them.
+
+### The set around it
+
+- `magento-integration-flow`: the queued bullets now delegate rather than summarise — acceptance-is-not-completion gained the missing half (the receipt carries no entity), and a new line records that queued routes are declared separately from their synchronous originals, so the existence check has to run against the async declaration
+- `docs/skill-set.md`: the reasoning for the split, on the same test that produced `magento-integration-querying`; the deliberate exclusion of transport and encoding narrowed to encoding only, now that the queued path's behaviour is covered
+- README and skill-set tables: ten skills became eleven
+
+### Verification
+
+- Queued-write-path pass recorded against 2.4.8-p5 on two websites, database queue, no broker
+- Two claims marked source-read rather than executed: the two cron jobs and the retention default
+- Not-tested list gained the retriably-failed and rejected states in normal operation, and batch expiry observed end to end
+
+### The two scope hazards, harvested in the same pass
+
+The queued-path work surfaced one of them incidentally, so both were run rather than left recorded.
+
+- `magento-integration-catalog-structure`: **corrected** both. The website fan-out is real but **create-only and route-specific** — the all-scope create with no website list lands in every website, while the scopeless and store-view creates each land in one, an explicit list is respected, and the *update* half of the report did not reproduce at all. The fix therefore shrinks from read-before-write to sending the website list on every create. The store-scoped attribute pinning **did not reproduce**: a name-only store-scoped update wrote one scoped record where sixteen attributes were populated globally, and is now recorded as not reproduced rather than fixed, with the shape tested stated
+- `magento-integration-catalog-structure`: new artifact recorded in its place — date-typed attributes gain empty records at every store view on any update, isolated with a scopeless control, so a store-level record is not evidence of a deliberate scoped write
+- `docs/verification.md`: the scope-hazard pass recorded; the not-tested entry for these two hazards replaced with the narrower limit that actually remains

@@ -17,6 +17,7 @@ stale_after: 2027-08-25T00:00:00Z
 |---|---|---|
 | `magento-integration-flow` | Build order, access preconditions, cross-cutting failure modes, when to verify | the *Magento ERP Integration* pillar |
 | `magento-integration-querying` | Reading data out: filter model, silent no-ops, paging while writing | the *Magento ERP Integration* pillar |
+| `magento-integration-async-bulk` | The queued write path: the receipt, split validation, status routes, the permission that blocks them | the *Magento ERP Integration* pillar |
 | `magento-integration-catalog-structure` | Products and variants; scope fallback; silent writes | `magento2-rest-product-import-pitfalls` |
 | `magento-integration-attributes` | Types, options, per-store labels, swatches, third-party properties | `magento2-rest-product-attributes` |
 | `magento-integration-media` | Duplication, gallery-vs-role scope split, deletion refusals | `magento2-rest-product-media` |
@@ -33,6 +34,12 @@ stale_after: 2027-08-25T00:00:00Z
 Read mechanics were originally written into three skills at once, which is the exact drift risk the note above warns about. They are also genuinely cross-cutting: filter combination, paging and sort behaviour are identical whatever entity is being read. Extracting `magento-integration-querying` removes the duplication and gives reading its own trigger, which is a different moment from importing.
 
 Family-specific read *facts* stayed with their family — that a category's membership includes never-listed variant children is catalog semantics, not query mechanics.
+
+# Why the queued path is its own skill
+
+Same argument as querying, on the write side. The queued path's *sequencing and infrastructure* — build order, the broker question, the consumer, deadlocks — is a flow concern and stayed in `magento-integration-flow`. Its **result contract** is not: the receipt that replaces the entity response, validation splitting across two moments with opposite granularities, four status routes answering different questions, and a permission unrelated to the write that guards all of them. That material is identical for every entity family, which is exactly the test that produced `magento-integration-querying`, and it has its own trigger — switching a feed to the queued path is a different moment from planning one.
+
+It also fails the flow skill's own shape test: none of it decides what to build in which order.
 
 # Why orders are two skills
 
@@ -54,6 +61,6 @@ The skills contain no endpoint paths, no field names, no request bodies and no c
 
 **A payment-provider matrix.** The payment behaviour in `magento-integration-fulfilment` was measured against a stand-in gateway, so it describes Magento's own bookkeeping and not any real provider. A module can place an order into review, capture from a webhook, or create the invoice itself, and no skill can predict which — the skill therefore carries the *test pass* to run per method rather than a table of answers.
 
-**Transport and format concerns.** Content negotiation, the alternate request encoding and its quirks on the queued path are documented in the article series and deliberately not here: they are client-shaped rather than behaviour-shaped, and a client that has chosen its encoding has already answered them.
+**Transport and format concerns.** Content negotiation and the alternate request encoding, including its quirks on the queued path, are documented in the article series and deliberately not here: they are client-shaped rather than behaviour-shaped, and a client that has chosen its encoding has already answered them. The queued path's *behaviour* is in `magento-integration-async-bulk`; only its encoding is excluded.
 
 **Anything not executed.** See [Verification](verification.md) for what was measured and what was not.

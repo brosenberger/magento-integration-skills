@@ -6,7 +6,7 @@ description: >-
 
 # magento-integration-flow — sequencing a Magento data integration
 
-Orchestration skill. Decides **what to build in which order** and encodes the failure modes that recur across every endpoint family. Delegates per-family specifics to the group skills: `magento-integration-catalog-structure`, `-attributes`, `-media`, `-prices-stock`, `-categories`, `-customers`, `-orders`, `-fulfilment`, and the cross-cutting read path to `-querying`.
+Orchestration skill. Decides **what to build in which order** and encodes the failure modes that recur across every endpoint family. Delegates per-family specifics to the group skills: `magento-integration-catalog-structure`, `-attributes`, `-media`, `-prices-stock`, `-categories`, `-customers`, `-orders`, `-fulfilment`, the cross-cutting read path to `-querying`, and the queued write path to `-async-bulk`.
 
 Deliberately agnostic about transport and language. Nothing here assumes a particular client, framework, or whether calls are made synchronously, batched, or queued.
 
@@ -60,7 +60,7 @@ These recur in every family. Check each one per endpoint rather than assuming th
 - **A success status does not mean the data was stored.** Several endpoints accept a payload, return success, and write nothing. Read back what matters instead of trusting the response.
 - **Idempotency is per-endpoint, not per-API.** Adjacent endpoints doing the same conceptual job differ: one upserts, its neighbour fails when the thing already exists. Write retry handling per call.
 - **Failure messages carry unresolved placeholders.** The human-readable string frequently omits the value; the value sits in a structured parameters field. Log the structured field or the log is useless.
-- **Queued acceptance is not completion.** An accepted batch is a receipt, not a result. Poll for terminal status and treat anything unfinished as an incident; failed operations are not retried indefinitely on their own.
+- **Queued acceptance is not completion.** An accepted batch is a receipt, not a result, and it does not carry the entity it wrote. Poll for terminal status and treat anything unfinished as an incident; nothing retries a failed operation on its own. The full result contract is `magento-integration-async-bulk`.
 - **There are no cross-resource transactions.** Structure, media, prices and stock are separate writes with no shared rollback. Design for partial state: make each step idempotent, record per-entity progress, make re-running a failed batch safe.
 - **Indexer mode decides the runtime.** Update-on-save turns every write into a reindex. Schedule mode plus a drain is the difference between one hour and nine.
 - **A generic failure message is a wrapper, not a cause.** Repositories catch and re-throw as "could not save", discarding nothing but telling you nothing either. The original is attached underneath — read the wrapped exception before changing any code. Guessing at fixtures, permissions or configuration because the top-level message was vague costs hours that one unwrap would have saved.
@@ -68,9 +68,12 @@ These recur in every family. Check each one per endpoint rather than assuming th
 
 ## Throughput, and the failures that are not in the API
 
+Sequencing and infrastructure below; the queued path's own result contract — the receipt, the split validation, the status routes and the permission that guards them — is `magento-integration-async-bulk`.
+
 - **A queued bulk path does not require a dedicated message broker.** This is the most repeated wrong thing about it: the consumer declares no connection and falls back to the database queue unless a broker is configured, and a full queued import ran end to end on a store with no broker installed at all. That was true in an older major version and stopped being true; assuming otherwise blocks imports on infrastructure nobody needs. A broker is still the better choice under real load — it is not a precondition.
 - **The consumer has to actually be running.** Cron starts it in most deployments; one started by hand dies with the terminal. Run it supervised with a message cap so it recycles, and remember that a stalled consumer looks exactly like a slow import for hours.
 - **The queued path carries the scope trap at bulk scale.** A scopeless queued route writes the same silent default-store override as its synchronous counterpart. Put the scope in the route there too.
+- **A queued route is declared separately from its synchronous original.** Not every write has a queued twin and reads have none, so the existence check above has to run against the async declaration rather than the synchronous one.
 - **Indexer mode decides the runtime.** Beyond schedule-versus-save: the change-log tables grow to millions of rows during a large run and cron has to drain them, and for a full replacement it is often faster to turn indexing off entirely, import, and reindex once. Cache invalidation lands at the end regardless, so schedule imports away from traffic peaks and warm afterwards.
 - **Parallel writers deadlock.** Writers touching the same entity, index and rewrite tables produce lock-wait failures. Partition work by a hash of the entity key so one entity is only ever touched by one worker, cap concurrency low and measure — past the deadlock threshold, more workers *reduce* throughput — retry the deadlock error with jittered backoff, since unlike a validation failure it is legitimately retryable, and never run two imports of the same catalog concurrently. **Honest limit:** a deliberate attempt to provoke this on a small sandbox produced no deadlock at all, so treat it as sound practice that one verification pass could not reproduce a failure for rather than as measured behaviour.
 - **The API shares the storefront's process pool** unless it is separated. A hot import can take the shop down while every Magento metric looks healthy. Give the API its own pool.
