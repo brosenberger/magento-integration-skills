@@ -21,6 +21,8 @@ verified:
     at: 2026-09-01T00:00:00Z
   - by: magento2-sandbox (Magento Open Source 2.4.8-p5, two websites) — queued write path and scope-hazard pass
     at: 2026-09-09T00:00:00Z
+  - by: magento2-sandbox (Magento Open Source 2.4.8-p5, two websites) and magento2-sandbox-249 (Magento Open Source 2.4.9) — silent-write sweep, blind-refereed
+    at: 2026-10-09T00:00:00Z
 status: stable
 stale_after: 2027-02-25T00:00:00Z
 ---
@@ -103,6 +105,20 @@ A different artifact did surface and was isolated with a control: date-typed att
 Executed 2026-09-07 on the same install, on a two-website topology (three store views on one website, one on the other), prompted by a field report rather than by an audit.
 
 Measured: `catalog_eav_attribute.is_global` for the enablement attribute; four out-of-range writes across two typed scalars, one custom attribute and one bogus option reference, all accepted and stored; the fan-out of a single store-view-scoped write across a website; a default-scope write failing to clear those records; per-store reads across both websites; a price reindex with the invalid value and with the legitimate disabled value, on the affected website and the untouched one; both reset payloads (`null` and empty string) on a numeric, an optional text and a required text attribute, at store-view and at default scope; and a reindex after the default record was removed. Source was read only to explain results already observed — the source model's option list, the grid column's label lookup, and the indexer's join type. Probe products were removed afterwards.
+
+# The silent-write sweep
+
+Executed 2026-10-09 by an automated harness. Each probe makes one write and reads the effect back through REST and SQL, classifying it as stored-as-sent, refused, or **accepted-and-stored-differently**. The harness ran against the 2.4.8-p5 sandbox and was then re-run unchanged against a separate **2.4.9** install. Before its results counted, it had to keep three round-trip controls clean and re-detect all seven previously recorded silent writes on both installs. It did both.
+
+Measured, beyond what earlier passes recorded:
+- A valid-value round trip for every attribute in the default set at global scope. It was clean, which was useful as a negative result.
+- A 12-attribute × 5-route scope matrix. It matched the recorded scope semantics, with the scopeless override generalised to every non-global attribute.
+- Omission against explicit-empty semantics for websites, tier prices, categories, links and attributes. The contract held.
+- 26 out-of-domain or over-limit product writes, plus cart and address writes.
+
+Findings now in the skills: over-length text truncation (flow), unvalidated product type (catalog-structure), tier quantity and inverted date windows through a product save (prices-stock), unknown category identifiers filtered out (categories), and quantity coercion plus split address checks in the cart sequence (fulfilment). Each was reproduced with unseen values on fresh entities and on 2.4.9.
+
+**Blind referees.** Four independent reviewers, given only the bare claims, re-derived each finding on 2.4.9 and attacked its cause, its silence and its significance. They corrected two explanations before anything was written here. The category drop is a deliberate existence filter, not a swallowed constraint violation. The region claim's suspected upstream duplicate concerns a different mechanism. They also measured the consequences recorded above: an unknown-type product drops out of every index, and an inverted special-price window means the price never applies. The truncation's cause was isolated outside Magento: the same over-length insert fails under the server's strict mode and is shortened, with no error, under the connection mode Magento sets. Source was read only to explain observed results.
 
 # Not tested
 

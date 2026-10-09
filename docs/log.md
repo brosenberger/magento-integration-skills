@@ -123,6 +123,18 @@ The queued-path work surfaced one of them incidentally, so both were run rather 
 - `magento-integration-catalog-structure`: new artifact recorded in its place — date-typed attributes gain empty records at every store view on any update, isolated with a scopeless control, so a store-level record is not evidence of a deliberate scoped write
 - `docs/verification.md`: the scope-hazard pass recorded; the not-tested entry for these two hazards replaced with the narrower limit that actually remains
 
+## 2026-10-09 — a harness-driven silent-write sweep, refereed blind, confirmed on 2.4.9
+
+An automated write-and-read-back harness swept product, category, customer and cart writes on 2.4.8-p5, and every finding was re-run on a separate 2.4.9 install. Four blind referees then re-derived each finding from the bare claim.
+
+- `flow`: two cross-cutting entries. Over-length text is shortened rather than refused, because Magento runs its connections without strict mode; customer names are the validated exception. And the success response is the cheapest read-back, because coerced, filtered and overridden values usually come back in it.
+- `catalog-structure`: an unknown product type is stored as sent. The product loads but drops out of the price, stock and search indexes, so it cannot be bought or found.
+- `prices-stock`: the product save skips two checks the price path makes. Tier rows with a quantity of zero or below are stored (inert, but persistent). Inverted special-price and "new" windows are stored, because the range check is armed only by the admin form, so the special price silently never applies. New verification sweep for both.
+- `categories`: unknown category identifiers on the product side are filtered out with success. A list of only unknown identifiers keeps everything, while an empty list removes everything.
+- `fulfilment`: in the cart sequence, non-positive quantities are corrected to one or ignored (upstream #41429). A region from another country is accepted at the shipping step and rejected only at placement. Postcode format is never checked, on cart or customer addresses.
+- `docs/verification.md`: the sweep and the referee pass recorded, plus the first 2.4.9 confirmation.
+- Deliberately left out: the self-service customer route overriding group, store and website from the token. It is intended, and integrations do not write through that route.
+
 ## 2026-10-21 — an inactive store view is still a write target
 
 A question rather than a field report: what happens to translations sent to a store view that is switched off. Reproduced on the 2.4.9 sandbox with an inactive view on the default website.

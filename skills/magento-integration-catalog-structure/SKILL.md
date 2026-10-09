@@ -89,6 +89,8 @@ The recurring failure mode in this family. Writes that report success and store 
 
 Product types also differ in what they accept: some silently drop a price they do not own, some coerce it, and at least one refuses to be created without extra structure. Read back what you wrote for each type once, then encode it.
 
+**The product type itself is not validated.** A type the install does not have is stored as sent, and the write succeeds. The product still loads, because the runtime quietly treats an unknown type as the simplest one. But every indexer that selects by type skips it: no price row, no stock row, no search entry. The product exists and shows in the admin, but it has no add-to-cart and cannot be found. Check the type against the install's own list of types before the first write.
+
 ## The business key is not unique, and two writers can prove it
 
 **The product's business key carries an ordinary index, not a unique constraint.** Uniqueness is enforced in application code: the save reads for an existing entity, finds nothing, and creates. Nothing underneath rejects the second row, so **two creates for the same key that overlap inside that window both succeed** — two success responses, two identifiers, one key. Reproduced on every attempt across fourteen races on 2.4.8-p5, through the repository and over the API alike.

@@ -14,6 +14,11 @@ Group skill under `magento-integration-flow`. Agnostic of client and transport.
 
 Full product saves are for *structural* change. Price, cost, tier price and quantity are not structural.
 
+**The product save also skips checks the price path makes.** Two measured cases:
+
+- **Tier rows with a quantity of zero or below are stored** through a product save. The dedicated price path reports the same row as a per-item failure. The row is inert, because the price index only reads the base-quantity tier and skips the negative one. But it persists, shows in the admin and comes back on every read.
+- **A special-price window that ends before it starts is stored** on any API save, and so is the same inversion on the "new from / new to" window. The start-before-end check exists, but only the admin form arms it, never the API. The special price then never applies and nothing says so: a promotion the merchant believes is live is silently dead. Check start ≤ end client-side.
+
 ## The two error models are opposites — this is the whole skill
 
 Price and stock look like the same kind of endpoint. They behave in opposite ways on both axes, and code written for one silently corrupts data when pointed at the other.
@@ -106,6 +111,7 @@ The older checklist still applies underneath — children created before their q
 - Compare source quantity against salable quantity for a sample, and reconcile the difference against reservations rather than assuming a bug.
 - Sweep for stock rows whose entity no longer exists — the residue of silently accepted bad identifiers.
 - Confirm the price scope you are writing at is the scope the store actually resolves.
+- Sweep for special-price and "new" windows whose start lies after their end, and for tier rows with a quantity below one.
 
 ## Anti-patterns
 

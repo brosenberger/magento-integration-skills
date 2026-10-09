@@ -31,6 +31,8 @@ So assignments only ever accumulate unless you remove them explicitly, and the o
 
 **An anti-fact worth carrying explicitly:** the product-side array is widely described as *replacing* the assignment set, and an assignment collection that appears only in read responses is widely described as being *ignored* on write. Both are wrong on 2.4.8-p5 — the array merges, and that second collection does assign, because the same save handler seeds its working set from it. Prefer the documented collection anyway, since it is the one that carries position; just do not spend a day debugging the other on the assumption that it is a no-op.
 
+**Unknown category identifiers are filtered out, not refused.** On the product side, identifiers that do not exist are removed before anything is written. The call succeeds with the valid remainder, and nothing is logged. The success response lists only the assignments it kept, so diff it against what you sent. A list made *only* of unknown identifiers changes nothing, while an empty list removes everything. The same "nothing valid to write" outcome means *keep* in one case and *wipe* in the other, depending on whether the list had entries before filtering.
+
 ## Removal is its own operation, and it is not idempotent
 
 Removing one assignment requires the category-side removal call. It succeeds once. Calling it again — or calling it for an assignment that never existed — **fails**, and the failure cannot distinguish "already removed" from "never assigned".
@@ -60,6 +62,7 @@ Filtering products by category uses the singular link field. The plural one visi
 
 - Re-run and confirm the second run changes nothing.
 - Check for categories missing the external key — those are unmappable on the next run.
+- Compare the category assignments in each product-side success response with the ones sent. Missing entries are identifiers the install silently filtered out.
 - Check for non-anchor categories with children before believing an "empty category page" bug report.
 - Watch rewrite row counts across runs; unbounded growth means the feed is churning assignments.
 
