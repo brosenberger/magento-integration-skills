@@ -16,6 +16,7 @@ The route decides which scope a write lands in, and the unscoped form is not "gl
 - Write translated data only through a specific scope, and only for attributes that are genuinely scope-dependent.
 - Never let the client fall back to an unscoped route because a scope lookup returned nothing. Fail the entity instead.
 - Know which attributes are scope-dependent before you start. The grouping is not intuitive — display text is usually per store view, commercial values usually global, and enablement is often per website rather than per store view, so "disable in one store view" may not be expressible at all.
+- A store view being switched off does not stop a scoped write. Translations sent to an inactive view are stored and surface the moment it is activated. See the inactive-scope entry in `magento-integration-flow`.
 
 **Restoring inheritance means deleting the scoped record, not writing over it.** Repeating the global value creates a permanently divergent copy, and sending an *empty* value writes an empty value — which pins "no value" on that scope rather than clearing it. The write that actually deletes is an explicit **null**, and it is the API's equivalent of the admin's *use default* control. Measured on 2.4.8-p5: `null` on a scoped route removed the scoped row for a numeric attribute, an optional text attribute and a required one alike, while `""` on the same text attribute left a row behind holding a database NULL.
 

@@ -122,3 +122,10 @@ The queued-path work surfaced one of them incidentally, so both were run rather 
 - `magento-integration-catalog-structure`: **corrected** both. The website fan-out is real but **create-only and route-specific** — the all-scope create with no website list lands in every website, while the scopeless and store-view creates each land in one, an explicit list is respected, and the *update* half of the report did not reproduce at all. The fix therefore shrinks from read-before-write to sending the website list on every create. The store-scoped attribute pinning **did not reproduce**: a name-only store-scoped update wrote one scoped record where sixteen attributes were populated globally, and is now recorded as not reproduced rather than fixed, with the shape tested stated
 - `magento-integration-catalog-structure`: new artifact recorded in its place — date-typed attributes gain empty records at every store view on any update, isolated with a scopeless control, so a store-level record is not evidence of a deliberate scoped write
 - `docs/verification.md`: the scope-hazard pass recorded; the not-tested entry for these two hazards replaced with the narrower limit that actually remains
+
+## 2026-10-21 — an inactive store view is still a write target
+
+A question rather than a field report: what happens to translations sent to a store view that is switched off. Reproduced on the 2.4.9 sandbox with an inactive view on the default website.
+
+- `flow`: new cross-cutting entry. The route resolves inactive store codes like active ones, so synchronous and queued product writes stored name, description and short description at the inactive view's scope with success. Nothing showed on the storefront until activation, then everything appeared at once, URL rewrites and search index already in place. An unknown store code fails with the generic "cannot be processed" message.
+- `catalog-structure`: one line pointing translation feeds at that entry.
