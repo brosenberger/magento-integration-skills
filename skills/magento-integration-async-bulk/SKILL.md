@@ -19,6 +19,7 @@ The queued route does not return what it wrote. It returns a receipt: a batch id
 Each entry carries three things — **a positional index, a content hash of that item, and an accepted-or-rejected flag**. It does not carry an entity identifier, the business key you sent, or a location to fetch later. So:
 
 - **Correlation is positional and it is yours to maintain.** The index in the receipt is the index in your request array, and it is the same index the status routes use to identify the operation. Preserve request order and store the map from index to business key on your side. Nothing on the Magento side reconstructs it, and the batch identifier alone will not tell you which of your rows failed.
+- **The index survives only if the encoding keeps it.** With the XML body, the batch cannot repeat the generic list element at its top level — two or more of them reject the whole request as missing the payload's root field — so items go under distinct element names, numbered by convention. That is accepted and every item executes, but the names are not integers: every receipt entry and every stored operation gets index zero. And because the consumer records each outcome against batch identifier plus index, each finished item overwrites the state, message and result of **every** operation in the batch, so the last item processed decides what the whole batch reports. Measured on a two-item batch: both items stored, both operations carrying the second item's result payload. The mixed case was not provoked, but the same update means a failed item followed by a successful one reads as two successes. Where the per-item outcome matters in that encoding, send one item per queued request, or read every entity back (`flow`).
 - **The content hash is not an idempotency key.** Re-posting a byte-identical batch is accepted again, into a new batch identifier, with the same hashes, and it executes again. Measured. The queue removes none of the duplicate-run risk the synchronous path has — so the *run it twice and diff* test from `flow` is not weakened here, it is the only thing that catches a replay.
 - **Queuing a single entity gets you the same receipt.** There is a single-item queued route alongside the batch one; it takes one object instead of an array and returns a one-entry receipt. It does not return the entity either. If any part of the integration needs the created identifier back in the response, the queued path cannot serve it — use the synchronous route for that call.
 
@@ -82,6 +83,7 @@ It buys throughput and costs feedback: no per-item response status, no immediate
 - Send a batch with one deliberately mistyped item and confirm your client handles losing the whole batch, not one row.
 - Send a batch with one structurally valid but business-invalid item and confirm your client records the per-item failure against the right business key.
 - Confirm the poller distinguishes *still open* from *failed*, and that it gives up on its own deadline rather than waiting for one the platform never sets.
+- If the batch is sent as XML, check that the receipt indices are distinct. All zeros means the status routes cannot tell the items apart, and their per-item outcome is not evidence of anything.
 - Re-send a completed batch and diff. A second run that is not a no-op means the family's write was never idempotent — the queue did not make it so.
 
 ## Anti-patterns
@@ -93,5 +95,6 @@ It buys throughput and costs feedback: no per-item response status, no immediate
 - Batching thousands of rows into one request, where a single type error costs all of them.
 - Granting the write permission and not the status permission.
 - Storing the batch identifier as the durable record of what happened.
+- Trusting per-item status from a batch whose receipt indices are all zero.
 - Sending user-facing writes down the queued path for throughput nobody needed.
 - Assuming the queued path validates less than the synchronous one, or that it validates the same.

@@ -141,3 +141,11 @@ A question rather than a field report: what happens to translations sent to a st
 
 - `flow`: new cross-cutting entry. The route resolves inactive store codes like active ones, so synchronous and queued product writes stored name, description and short description at the inactive view's scope with success. Nothing showed on the storefront until activation, then everything appeared at once, URL rewrites and search index already in place. An unknown store code fails with the generic "cannot be processed" message.
 - `catalog-structure`: one line pointing translation feeds at that entry.
+
+## 2026-10-21 — an XML batch collapses every item index to zero
+
+Found while answering a website-assignment question for an XML-only middleware, on a 2.4.8-p5 project install.
+
+- `async-bulk`: in an XML batch the top-level list element cannot repeat, so items go under numbered element names. Every receipt entry and operation then gets index zero, and each finished item overwrites the outcome of all operations in the batch: two stored items, two rows showing the second item's result. New verification check and anti-pattern for all-zero indices.
+- `docs/skill-set.md`: the transport-and-format exclusion now names this one exception, because it breaks the result contract rather than the encoding.
+- `docs/verification.md`: the pass recorded, and the mixed-outcome case added to the not-tested list.
