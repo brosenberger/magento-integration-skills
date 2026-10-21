@@ -149,3 +149,10 @@ Found while answering a website-assignment question for an XML-only middleware, 
 - `async-bulk`: in an XML batch the top-level list element cannot repeat, so items go under numbered element names. Every receipt entry and operation then gets index zero, and each finished item overwrites the outcome of all operations in the batch: two stored items, two rows showing the second item's result. New verification check and anti-pattern for all-zero indices.
 - `docs/skill-set.md`: the transport-and-format exclusion now names this one exception, because it breaks the result contract rather than the encoding.
 - `docs/verification.md`: the pass recorded, and the mixed-outcome case added to the not-tested list.
+
+## 2026-10-21 — the mixed XML batch, provoked
+
+Follow-up on the same install: two-item XML batches with one item failing in the consumer, run in both orders, plus a JSON control.
+
+- `async-bulk`: the "not provoked" caveat replaced by the measurement. Failure first and success last reported two successes while the failed item was never stored; the reverse order reported two failures while the valid item was stored. The JSON control reported each item correctly.
+- `docs/verification.md`: the mixed batches added to the pass, and the line removed from the not-tested list.

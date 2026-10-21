@@ -126,9 +126,9 @@ Findings now in the skills: over-length text truncation (flow), unvalidated prod
 
 Executed 2026-10-21 on a Magento Open Source 2.4.8-p5 project install with two websites and the queue on the database, not the sandbox, while answering a website-assignment question for an XML-only middleware.
 
-Measured: a two-item product batch with the generic list element repeated at the top level, rejected whole as missing the payload's root field; a one-item batch in the same shape, accepted and completed; a two-item batch under numbered element names, accepted with both receipt indices at zero and both items stored; the detailed status and the stored operation rows of that batch both carrying the second item's result payload; and the same two items sent as a JSON array, receiving indices zero and one. Every write was reverted and checked afterwards.
+Measured: a two-item product batch with the generic list element repeated at the top level, rejected whole as missing the payload's root field; a one-item batch in the same shape, accepted and completed; a two-item batch under numbered element names, accepted with both receipt indices at zero and both items stored; the detailed status and the stored operation rows of that batch both carrying the second item's result payload; the same two items sent as a JSON array, receiving indices zero and one; and two mixed batches under numbered element names, one item valid and one referencing a nonexistent website so that it failed only in the consumer. Failure first and success last reported both operations complete, with the failed item never stored; the reverse order reported both failed, with the valid item stored. The same mixed batch as a JSON array reported each item correctly. Every write was reverted and checked afterwards.
 
-Source was read only to explain the overwrite: the consumer's status update matches on batch identifier plus index. A batch where one item fails and another succeeds was not run.
+Source was read only to explain the overwrite: the consumer's status update matches on batch identifier plus index.
 
 # Not tested
 
@@ -138,7 +138,6 @@ Stated explicitly, because silence reads as coverage:
 - **The store-scoped attribute-pinning report, outside the shape tested.** It did not reproduce on a simple product with one attribute in the payload and no pre-existing store overrides; other product types, attribute sets and payload shapes were not tried.
 - **The retriably-failed state in normal operation.** What produces it other than an interrupted consumer, and whether re-sending after one is safe per family, were not exercised. Neither was the rejected state, which requires a publish-time failure.
 - **Batch expiry observed end to end.** The retention default and the cleanup job's lack of a status filter were read from the shipped configuration and the job, not watched deleting a batch.
-- **A mixed outcome in an XML batch with collapsed indices.** That a failed item followed by a successful one reads as two successes follows from the source-read update and the measured overwrite; it was not provoked.
 - **Deadlocks under parallel writers.** Deliberately provoked with 256 concurrent overlapping writes and **not reproduced** — which says the sandbox is too small, not that the problem is gone.
 - **Behaviour at catalog scale.** Rewrite growth and reassignment cost need a catalog far larger than sample data.
 - **Reservation behaviour under concurrent orders.** Needs order traffic this pass did not generate.
